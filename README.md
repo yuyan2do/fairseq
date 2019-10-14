@@ -4,6 +4,8 @@ Fairseq(-py) is a sequence modeling toolkit that allows researchers and
 developers to train custom models for translation, summarization, language
 modeling and other text generation tasks.
 
+fork pytorch/fairseq
+
 ### What's New:
 
 - September 2019: [Nonautoregressive translation code released](examples/nonautoregressive_translation/README.md)
