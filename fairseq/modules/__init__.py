@@ -25,6 +25,7 @@ from .scalar_bias import ScalarBias
 from .sinusoidal_positional_embedding import SinusoidalPositionalEmbedding
 from .transformer_sentence_encoder_layer import TransformerSentenceEncoderLayer
 from .transformer_sentence_encoder import TransformerSentenceEncoder
+from .bert_sentence_encoder import BertSentenceEncoder
 from .unfold import unfold1d
 from .transformer_layer import TransformerDecoderLayer, TransformerEncoderLayer
 from .vggblock import VGGBlock
@@ -33,6 +34,7 @@ __all__ = [
     'AdaptiveInput',
     'AdaptiveSoftmax',
     'BeamableMM',
+    'BertSentenceEncoder',
     'CharacterTokenEmbedder',
     'ConvTBC',
     'DownsampledMultiHeadAttention',

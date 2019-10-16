@@ -13,7 +13,7 @@ from fairseq.data import (
     Dictionary,
     encoders,
     IdDataset,
-    MaskTokensDataset,
+    MaskPositionsDataset,
     NestedDictionaryDataset,
     NumelDataset,
     NumSamplesDataset,
@@ -25,8 +25,8 @@ from fairseq.data import (
 from fairseq.tasks import FairseqTask, register_task
 
 
-@register_task('masked_lm')
-class MaskedLMTask(FairseqTask):
+@register_task('masked_position')
+class MaskedPositionTask(FairseqTask):
     """Task for training masked language models (e.g., BERT, RoBERTa)."""
 
     @staticmethod
@@ -128,7 +128,7 @@ class MaskedLMTask(FairseqTask):
         else:
             mask_whole_words = None
 
-        src_dataset, tgt_dataset = MaskTokensDataset.apply_mask(
+        src_dataset, tgt_dataset, src_positions, tgt_positions = MaskPositionsDataset.apply_mask(
             dataset,
             self.source_dictionary,
             pad_idx=self.source_dictionary.pad(),
@@ -155,9 +155,19 @@ class MaskedLMTask(FairseqTask):
                             left_pad=False,
                         ),
                         'src_lengths': NumelDataset(src_dataset, reduce=False),
+                        'src_positions': PadDataset(
+                            src_positions,
+                            pad_idx=self.source_dictionary.pad(),
+                            left_pad=False,
+                        ),
                     },
                     'target': PadDataset(
                         tgt_dataset,
+                        pad_idx=self.source_dictionary.pad(),
+                        left_pad=False,
+                    ),
+                    'target_position': PadDataset(
+                        tgt_positions,
                         pad_idx=self.source_dictionary.pad(),
                         left_pad=False,
                     ),
