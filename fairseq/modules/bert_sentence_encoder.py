@@ -149,6 +149,8 @@ class BertSentenceEncoder(nn.Module):
         else:
             self.emb_layer_norm = None
 
+        self.static_positions = (torch.cumsum(torch.ones(self.max_seq_len), dim=0).int()).detach()
+
         # Apply initialization of model params after building the model
         if self.apply_bert_init:
             self.apply(init_bert_params)
@@ -173,6 +175,7 @@ class BertSentenceEncoder(nn.Module):
         segment_labels: torch.Tensor = None,
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
+        masked_positions: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         # compute padding mask. This is needed for multi-head attention
@@ -188,6 +191,12 @@ class BertSentenceEncoder(nn.Module):
         position_embed = None
         if self.embed_positions is not None:
             position_embed = self.embed_positions(tokens, positions=positions)
+            if masked_positions is not None:
+                masked_span_positions = (self.static_positions[None,:masked_positions.size()[-1]] * masked_positions.int()) + self.padding_idx 
+                masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions.long()).sum(dim=-2)
+                masked_span_embed = masked_span_embed / masked_positions.int().sum(dim=-1).type_as(masked_span_embed)[:,None]
+                for i in range(position_embed.size()[0]):
+                    position_embed[i, masked_positions[i]] = masked_span_embed[i]
             x = token_embed + position_embed
         else:
             x = token_embed + 0
@@ -224,4 +233,4 @@ class BertSentenceEncoder(nn.Module):
         if last_state_only:
             inner_states = [x]
 
-        return inner_states, sentence_rep, token_embed, position_embed
+        return inner_states, sentence_rep

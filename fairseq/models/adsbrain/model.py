@@ -290,25 +290,22 @@ class RobertaEncoder(FairseqDecoder):
                 - a dictionary of additional data, where 'inner_states'
                   is a list of hidden states.
         """
-        x, extra = self.extract_features(src_tokens, return_all_hiddens, positions=None)
+        x, extra = self.extract_features(src_tokens, return_all_hiddens, positions=None, masked_positions=None)
         if not features_only:
-            token_embed = extra['token_embed']
-            position_embed = extra['position_embed']
-            x_positions = self.output_position_layer(x - token_embed, masked_positions=masked_positions)
+            x_positions = self.output_position_layer(x, masked_positions=masked_positions)
             extra['position_logits'] = x_positions
-            x = self.output_layer(x - position_embed, masked_tokens=masked_tokens)
+            x = self.output_layer(x, masked_tokens=masked_tokens)
         return x, extra
 
-    def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, **unused):
-        inner_states, _, token_embed, position_embed = self.sentence_encoder(
+    def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, masked_positions=None, **unused):
+        inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
-            positions=positions
+            positions=positions,
+            masked_positions=masked_positions
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None, \
-                          'token_embed': token_embed, \
-                          'position_embed': position_embed, \
                          }
 
     def output_layer(self, features, masked_tokens=None, **unused):
@@ -336,6 +333,9 @@ def base_architecture(args):
     args.attention_dropout = getattr(args, 'attention_dropout', 0.1)
     args.activation_dropout = getattr(args, 'activation_dropout', 0.0)
     args.pooler_dropout = getattr(args, 'pooler_dropout', 0.0)
+
+    #fix max position to 512
+    args.max_positions = getattr(args, 'max_positions', 512)
 
 
 @register_model_architecture('adsbrain_roberta', 'adsbrain_roberta_base')
