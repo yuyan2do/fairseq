@@ -189,15 +189,21 @@ class BertSentenceEncoder(nn.Module):
             token_embed *= self.embed_scale
 
         position_embed = None
+        if tokens.is_cuda and not self.static_positions.is_cuda:
+            # TODO make it as a buffer to avoid this manual move
+            self.static_positions = self.static_positions.cuda(tokens.get_device())
+            print("######### " + str(self.static_positions.get_device()))
+
         if self.embed_positions is not None:
             batch_size, seq_len = tokens.size()
             position_embed = self.embed_positions(tokens, positions=positions)
             if masked_positions is not None:
-                masked_span_positions = (self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx 
-                masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions.long()).sum(dim=-2)
-                masked_span_embed = masked_span_embed / masked_positions.int().sum(dim=-1).type_as(masked_span_embed)[:,None]
-                for i in range(batch_size):
-                    position_embed[i, masked_positions[i]] = masked_span_embed[i]
+                with torch.no_grad():
+                    masked_span_positions = ((self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx).long()
+                    masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions).sum(dim=-2)
+                    masked_span_embed = masked_span_embed / masked_positions.int().sum(dim=-1).type_as(masked_span_embed)[:,None]
+                    for i in range(batch_size):
+                        position_embed[i, masked_positions[i]] = masked_span_embed[i]
             x = token_embed + position_embed
         else:
             x = token_embed + 0
