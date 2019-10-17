@@ -102,7 +102,7 @@ class MaskedPositionLoss(FairseqCriterion):
         position_sample_size = sum(log.get('position_sample_size', 0) for log in logging_outputs)
 
         agg_output = {
-            'position_loss': position_loss / position_sample_size / math.log(2),
+            'position_loss': position_loss / max(1, position_sample_size) / math.log(2),
             'loss': loss / sample_size / math.log(2),
             'nll_loss': sum(log.get('nll_loss', 0) for log in logging_outputs) / sample_size / math.log(2) if ntokens > 0 else 0.,
             'ntokens': ntokens,
