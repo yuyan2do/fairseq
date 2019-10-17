@@ -335,7 +335,7 @@ def base_architecture(args):
     args.pooler_dropout = getattr(args, 'pooler_dropout', 0.0)
 
     #fix max position to 512
-    args.max_positions = getattr(args, 'max_positions', 512)
+    #args.max_positions = getattr(args, 'max_positions', 512)
 
 
 @register_model_architecture('adsbrain_roberta', 'adsbrain_roberta_base')

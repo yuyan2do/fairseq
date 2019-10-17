@@ -190,12 +190,13 @@ class BertSentenceEncoder(nn.Module):
 
         position_embed = None
         if self.embed_positions is not None:
+            batch_size, seq_len = tokens.size()
             position_embed = self.embed_positions(tokens, positions=positions)
             if masked_positions is not None:
-                masked_span_positions = (self.static_positions[None,:masked_positions.size()[-1]] * masked_positions.int()) + self.padding_idx 
+                masked_span_positions = (self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx 
                 masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions.long()).sum(dim=-2)
                 masked_span_embed = masked_span_embed / masked_positions.int().sum(dim=-1).type_as(masked_span_embed)[:,None]
-                for i in range(position_embed.size()[0]):
+                for i in range(batch_size):
                     position_embed[i, masked_positions[i]] = masked_span_embed[i]
             x = token_embed + position_embed
         else:
