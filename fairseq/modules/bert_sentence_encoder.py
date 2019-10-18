@@ -176,6 +176,7 @@ class BertSentenceEncoder(nn.Module):
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
         masked_positions: Optional[torch.Tensor] = None,
+        fill_avg_position_weight: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         # compute padding mask. This is needed for multi-head attention
@@ -197,7 +198,7 @@ class BertSentenceEncoder(nn.Module):
         if self.embed_positions is not None:
             batch_size, seq_len = tokens.size()
             position_embed = self.embed_positions(tokens, positions=positions)
-            if masked_positions is not None:
+            if masked_positions is not None and fill_avg_position_weight:
                 with torch.no_grad():
                     masked_span_positions = ((self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx).long()
                     masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions).sum(dim=-2)

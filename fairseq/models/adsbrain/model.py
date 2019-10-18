@@ -78,6 +78,8 @@ class AdsbrainRobertaModel(FairseqLanguageModel):
                             help='number of positional embeddings to learn')
         parser.add_argument('--load-checkpoint-heads', action='store_true',
                             help='(re-)register and load heads when loading checkpoints')
+        parser.add_argument('--fill-avg-position-weight', action='store_true',
+                            help='enable to fill averagte positoin embedding for masked position')
 
     @classmethod
     def build_model(cls, args, task):
@@ -298,11 +300,13 @@ class RobertaEncoder(FairseqDecoder):
         return x, extra
 
     def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, masked_positions=None, **unused):
+        fill_avg_position_weight = getattr(self.args, 'fill_avg_position_weight', False)
         inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
             positions=positions,
-            masked_positions=masked_positions
+            masked_positions=masked_positions,
+            fill_avg_position_weight=fill_avg_position_weight,
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None, \

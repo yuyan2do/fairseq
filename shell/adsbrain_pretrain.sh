@@ -12,17 +12,17 @@ export PATH="$HOME/.local/bin:$PATH"
 PEAK_LR=0.0001          # Peak learning rate, adjust as needed
 
 DATA_DIR=~/data/bert_pretrain/data-bin
-EXAP_NAME=continue_train_fill_avg_embed
+EXAP_NAME=continue_train_fill_blank_embed
 SAVE_DIR=~/data/experiment/bert_base/${EXAP_NAME}/checkpoints
 mkdir -p ~/tensorboard/${DLWS_JOB_ID}/logs/${EXAP_NAME}
 TENSORBOARD_LOGDIR=~/tensorboard/${DLWS_JOB_ID}/logs/${EXAP_NAME}
 
 
-TOTAL_UPDATES=3622
+TOTAL_UPDATES=3565
 WARMUP_UPDATES=2857 
 TOKENS_PER_SAMPLE=512   
 MAX_SENTENCES=16      # MAX_SENTENCES=16  
-UPDATE_FREQ=42 #UPDATE_FREQ=128
+UPDATE_FREQ=64 #UPDATE_FREQ=128
 DATA_DIR=~/data/bert_pretrain/data-bin
 
 ROBERTA_PATH=~/data/roberta.base/adsbrain_model_position_head.pt
@@ -37,7 +37,7 @@ else
     EXAP_NAME=debug_tmp
 fi
 
-CUDA_VISIBLE_DEVICES=0,1,2 \
+CUDA_VISIBLE_DEVICES=1,2 \
 fairseq-train --fp16 $DATA_DIR \
     --restore-file $ROBERTA_PATH \
     --task masked_position --criterion masked_position \
@@ -53,5 +53,6 @@ fairseq-train --fp16 $DATA_DIR \
     --num-workers 0  \
     --fp16-init-scale 2 \
     --ddp-backend=no_c10d \
-    --max-epoch 6 \
-    --max-update $TOTAL_UPDATES --log-format tqdm
+    --max-epoch 10 \
+    --max-update $TOTAL_UPDATES --log-format tqdm \
+#    --fill-avg-position-weight
