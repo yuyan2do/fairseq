@@ -140,6 +140,10 @@ class MaskedPositionTask(FairseqTask):
             freq_weighted_replacement=self.args.freq_weighted_replacement,
             mask_whole_words=mask_whole_words,
         )
+        src_dataset.set_epoch(epoch)
+        tgt_dataset.set_epoch(epoch)
+        src_positions.set_epoch(epoch)
+        tgt_positions.set_epoch(epoch)
 
         with data_utils.numpy_seed(self.args.seed + epoch):
             shuffle = np.random.permutation(len(src_dataset))
