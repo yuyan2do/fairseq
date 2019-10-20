@@ -2,8 +2,8 @@
     "common": {
         "exp_name": "exp_name_is_blank",
         "data_dir": "~/data/bert_pretrain/data-bin",
-        "save_dir": "~/data/experiment/bert_base/${EXAP_NAME}/checkpoints",
-        "tensorboard_logdir": "~/tensorboard/${DLWS_JOB_ID}/logs/${EXAP_NAME}",
+        "save_dir": "~/data/experiment/bert_base/${EXP_NAME}/checkpoints",
+        "tensorboard_logdir": "~/tensorboard/${DLWS_JOB_ID}/logs/${EXP_NAME}",
         "max_epoch": 10,
         "peak_lr": 0.0001,
         "total_updates": 3565,
