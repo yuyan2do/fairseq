@@ -50,7 +50,7 @@ fairseq-train --fp16 $DATA_DIR \
     --skip-invalid-size-inputs-valid-test \
     --tensorboard-logdir $TENSORBOARD_LOGDIR \
     --save-dir $SAVE_DIR \
-    --num-workers 0  \
+    --num-workers 2  \
     --fp16-init-scale 2 \
     --ddp-backend=no_c10d \
     --max-epoch 10 \

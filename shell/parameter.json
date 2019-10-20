@@ -1,0 +1,29 @@
+{
+    "common": {
+        "exp_name": "exp_name_is_blank",
+        "data_dir": "~/data/bert_pretrain/data-bin",
+        "save_dir": "~/data/experiment/bert_base/${EXAP_NAME}/checkpoints",
+        "tensorboard_logdir": "~/tensorboard/${DLWS_JOB_ID}/logs/${EXAP_NAME}",
+        "max_epoch": 10,
+        "peak_lr": 0.0001,
+        "total_updates": 3565,
+        "warmup_updates": 2857,
+        "tokens_per_sample": 512,
+        "max_sentences": 16,
+        "update_freq": 64,
+        "num_workers": 2,
+        "fp16_init_scale": 8,
+        "restore_file": "",
+        "cuda_visible_devices": ""
+    },
+    "dgx_pretrain": {
+        "peak_lr": 0.001,
+        "total_updates": 35650,
+        "max_sentences": 32,
+        "update_freq": 8
+    },
+    "dgx_continue_train": {
+        "max_sentences": 32,
+        "update_freq": 8
+    }
+}

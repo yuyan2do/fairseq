@@ -1,0 +1,51 @@
+#!/bin/bash
+
+cd ~/code/fairseq
+#pip install --user fairseq
+pip install --user --editable .
+pip install --user tensorboardX
+
+export PATH="$HOME/.local/bin:$PATH"
+
+
+EXP_NAME=$exp_name
+
+
+DATA_DIR=$data_dir
+SAVE_DIR=$save_dir
+TENSORBOARD_LOGDIR=$tensorboard_logdir
+mkdir -p ~/tensorboard/${DLWS_JOB_ID}/logs/${EXP_NAME}
+
+RESTORE_FILE=$restore_file
+
+#train from scrach 0.001, continue train 0.0001
+PEAK_LR=$peak_lr          # Peak learning rate, adjust as needed
+MAX_EPOCH=$max_epoch
+TOTAL_UPDATES=$total_updates
+WARMUP_UPDATES=$warmup_updates
+TOKENS_PER_SAMPLE=$tokens_per_sample
+MAX_SENTENCES=$max_sentences
+UPDATE_FREQ=$update_freq
+
+NUM_WORKERS=$num_workers
+FP16_INIT_SCALE=$fp16_init_scale
+
+
+$cuda_visible_devices_command
+fairseq-train --fp16 $DATA_DIR $restore_file_command \
+    --task masked_position --criterion masked_position \
+    --arch adsbrain_roberta_base --sample-break-mode complete \
+    --tokens-per-sample $TOKENS_PER_SAMPLE \
+    --optimizer adam --adam-betas "(0.9, 0.98)" --adam-eps 1e-6 --clip-norm 0.0 \
+    --lr-scheduler polynomial_decay --lr $PEAK_LR --warmup-updates $WARMUP_UPDATES --total-num-update $TOTAL_UPDATES \
+    --dropout 0.1 --attention-dropout 0.1 --weight-decay 0.01 \
+    --max-sentences $MAX_SENTENCES --update-freq $UPDATE_FREQ \
+    --skip-invalid-size-inputs-valid-test \
+    --tensorboard-logdir $TENSORBOARD_LOGDIR \
+    --save-dir $SAVE_DIR \
+    --num-workers $NUM_WORKERS  \
+    --fp16-init-scale $FP16_INIT_SCALE \
+    --ddp-backend=no_c10d \
+    --max-epoch $MAX_EPOCH \
+    --max-update $TOTAL_UPDATES --log-format tqdm \
+    $extra_command
