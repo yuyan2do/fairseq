@@ -38,7 +38,9 @@ else:
 
 if args.restore_file:
     parameter['restore_file'] = args.restore_file
-    parameter['restore_file_command'] = '--restore-file "$RESTORE_FILE"'
+
+if parameter['restore_file']:
+    parameter['restore_file_command'] = '--restore-file $RESTORE_FILE'
 else:
     parameter['restore_file_command'] = ''
 

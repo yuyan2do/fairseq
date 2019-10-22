@@ -143,7 +143,7 @@ def train(args, trainer, task, epoch_itr):
                 extra_meters[k].update(v, log_output['sample_size'])
             else:
                 extra_meters[k].update(v)
-            stats[k] = extra_meters[k].avg
+            stats[k] = extra_meters[k]
         progress.log(stats, tag='train', step=stats['num_updates'])
 
         # ignore the first mini-batch in words-per-second calculation
@@ -166,7 +166,7 @@ def train(args, trainer, task, epoch_itr):
     # log end-of-epoch stats
     stats = get_training_stats(trainer)
     for k, meter in extra_meters.items():
-        stats[k] = meter.avg
+        stats[k] = meter
     progress.print(stats, tag='train', step=stats['num_updates'])
 
     # reset training meters
@@ -252,7 +252,7 @@ def validate(args, trainer, task, epoch_itr, subsets):
         # log validation stats
         stats = get_valid_stats(trainer, args, extra_meters)
         for k, meter in extra_meters.items():
-            stats[k] = meter.avg
+            stats[k] = meter
         progress.print(stats, tag=subset, step=trainer.get_num_updates())
 
         valid_losses.append(

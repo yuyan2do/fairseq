@@ -77,7 +77,11 @@ class MaskedPositionLoss(FairseqCriterion):
                 dtype=torch.float32,
             )
 
-        position_predict_correct_num = (torch.argmax(position_log_predict, dim=-1) == targets_position.view(-1)).sum().item()
+        if position_sample_size != 0:
+            position_predict_correct_num = (torch.argmax(position_log_predict, dim=-1) == targets_position.view(-1)).sum().item()
+        else:
+            position_predict_correct_num = 0
+
         position_accuracy = float(position_predict_correct_num) / max(1, position_sample_size)
 
         position_loss = F.nll_loss(

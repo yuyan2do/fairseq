@@ -25,5 +25,10 @@
     "dgx_continue_train": {
         "max_sentences": 32,
         "update_freq": 8
+    },
+    "v100_4gpu_continue_train": {
+        "max_sentences": 16,
+        "update_freq": 32,
+        "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
     }
 }
