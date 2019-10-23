@@ -23,6 +23,12 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
+    def __it__(self, other):
+        return self.avg < other.avg
+
+    def __gt__(self, other):
+        return self.avg > other.avg
+
 
 class TimeMeter(object):
     """Computes the average occurrence of some event per second"""

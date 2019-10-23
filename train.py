@@ -281,7 +281,7 @@ def get_valid_stats(trainer, args, extra_meters=None):
         if args.best_checkpoint_metric == 'loss':
             current_metric = stats['loss'].avg
         elif args.best_checkpoint_metric in extra_meters:
-            current_metric = extra_meters[args.best_checkpoint_metric].avg
+            current_metric = extra_meters[args.best_checkpoint_metric]
         elif args.best_checkpoint_metric in stats:
             current_metric = stats[args.best_checkpoint_metric]
         else:
