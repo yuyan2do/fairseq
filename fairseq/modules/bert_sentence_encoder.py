@@ -91,6 +91,8 @@ class BertSentenceEncoder(nn.Module):
         freeze_embeddings: bool = False,
         n_trans_layers_to_freeze: int = 0,
         export: bool = False,
+        fill_avg_position_weight: bool = False,
+        dynamic_constrain_visibility: bool = False,
     ) -> None:
 
         super().__init__()
@@ -103,6 +105,8 @@ class BertSentenceEncoder(nn.Module):
         self.use_position_embeddings = use_position_embeddings
         self.apply_bert_init = apply_bert_init
         self.learned_pos_embedding = learned_pos_embedding
+        self.fill_avg_position_weight = fill_avg_position_weight
+        self.dynamic_constrain_visibility = dynamic_constrain_visibility
 
         self.embed_tokens = nn.Embedding(
             self.vocab_size, self.embedding_dim, self.padding_idx
@@ -176,9 +180,9 @@ class BertSentenceEncoder(nn.Module):
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
         masked_positions: Optional[torch.Tensor] = None,
-        fill_avg_position_weight: bool = True,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
+        batch_size, seq_len = tokens.size()
         # compute padding mask. This is needed for multi-head attention
         padding_mask = tokens.eq(self.padding_idx)
         if not padding_mask.any():
@@ -196,9 +200,8 @@ class BertSentenceEncoder(nn.Module):
             print("######### " + str(self.static_positions.get_device()))
 
         if self.embed_positions is not None:
-            batch_size, seq_len = tokens.size()
             position_embed = self.embed_positions(tokens, positions=positions)
-            if masked_positions is not None and fill_avg_position_weight:
+            if masked_positions is not None and self.fill_avg_position_weight:
                 with torch.no_grad():
                     masked_span_positions = ((self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx).long()
                     masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions).sum(dim=-2)
@@ -228,8 +231,14 @@ class BertSentenceEncoder(nn.Module):
         if not last_state_only:
             inner_states.append(x)
 
+        self_attn_mask = None
+        if self.dynamic_constrain_visibility:
+            self_attn_mask = torch.zeros([seq_len, seq_len], dtype=x.dtype, device=x.get_device())
+            constrain_size = torch.randint(low=min(16, seq_len - 1), high=seq_len, size=(1,))[0]
+            self_attn_mask[:constrain_size][constrain_size:] = -1e4
+
         for layer in self.layers:
-            x, _ = layer(x, self_attn_padding_mask=padding_mask)
+            x, _ = layer(x, self_attn_padding_mask=padding_mask, self_attn_mask=self_attn_mask)
             if not last_state_only:
                 inner_states.append(x)
 

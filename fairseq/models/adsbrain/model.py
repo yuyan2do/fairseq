@@ -80,6 +80,8 @@ class AdsbrainRobertaModel(FairseqLanguageModel):
                             help='(re-)register and load heads when loading checkpoints')
         parser.add_argument('--fill-avg-position-weight', action='store_true',
                             help='enable to fill averagte positoin embedding for masked position')
+        parser.add_argument('--dynamic-constrain-visibility', action='store_true',
+                            help='enable to dynamic contrain visibility')
 
     @classmethod
     def build_model(cls, args, task):
@@ -247,6 +249,10 @@ class RobertaEncoder(FairseqDecoder):
     def __init__(self, args, dictionary):
         super().__init__(dictionary)
         self.args = args
+
+        fill_avg_position_weight = getattr(self.args, 'fill_avg_position_weight', False)
+        dynamic_constrain_visibility = getattr(self.args, 'dynamic_constrain_visibility', False)
+
         self.sentence_encoder = BertSentenceEncoder(
             padding_idx=dictionary.pad(),
             vocab_size=len(dictionary),
@@ -262,6 +268,8 @@ class RobertaEncoder(FairseqDecoder):
             encoder_normalize_before=True,
             apply_bert_init=True,
             activation_fn=args.activation_fn,
+            fill_avg_position_weight=fill_avg_position_weight,
+            dynamic_constrain_visibility=dynamic_constrain_visibility,
         )
         self.lm_head = RobertaLMHead(
             embed_dim=args.encoder_embed_dim,
@@ -300,13 +308,11 @@ class RobertaEncoder(FairseqDecoder):
         return x, extra
 
     def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, masked_positions=None, **unused):
-        fill_avg_position_weight = getattr(self.args, 'fill_avg_position_weight', False)
         inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
             positions=positions,
             masked_positions=masked_positions,
-            fill_avg_position_weight=fill_avg_position_weight,
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None, \
