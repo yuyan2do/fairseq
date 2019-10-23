@@ -139,18 +139,25 @@ class MaskPositionsDataset(BaseWrapperDataset):
                 return torch.from_numpy(new_item)
 
             if self.mask_position:
-                # mask 2 - 5 token
+                # mask 3 - 6 token
                 masked_positions = np.arange(1, 1 + sz) + self.pad_idx
                 new_item = np.full(sz, self.pad_idx)
 
                 num_position_mask = np.random.randint(4) + 3
                 num_position_mask = min(num_position_mask, sz)
-                if num_position_mask < 2 or sz - num_position_mask < 10:
+                if num_position_mask <= 1 or sz - num_position_mask <= 3:
                     num_position_mask = 0
+
+                def softmax(x):
+                    return np.exp((x - max(x))) / sum(np.exp((x - max(x))))
 
                 retry = 0
                 while num_position_mask > 0 and retry < 10:
-                    start_index = np.random.randint(sz - num_position_mask)
+                    #start_index = np.random.randint(sz - num_position_mask - 2) + 1
+                    # front position has higher probability been mask. token 1 has 5 times probability then last word token.
+                    start_index_probability = np.cumsum(-1*np.ones(sz - 2 - (num_position_mask - 1))) / (sz/2)
+                    start_index_probability = softmax(start_index_probability)
+                    start_index = np.random.choice(sz, 1, p=np.concatenate(([0], start_index_probability, [0] * num_position_mask)))[0]
                     end_index = start_index+num_position_mask
 
                     if mask[start_index:end_index].any():
