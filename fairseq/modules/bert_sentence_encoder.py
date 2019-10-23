@@ -232,7 +232,7 @@ class BertSentenceEncoder(nn.Module):
             inner_states.append(x)
 
         self_attn_mask = None
-        if self.dynamic_constrain_visibility:
+        if self.dynamic_constrain_visibility and self.training:
             self_attn_mask = torch.zeros([seq_len, seq_len], dtype=x.dtype, device=x.get_device())
             constrain_size = torch.randint(low=min(16, seq_len - 1), high=seq_len, size=(1,))[0]
             self_attn_mask[:constrain_size][constrain_size:] = -1e4

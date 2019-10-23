@@ -111,7 +111,7 @@ class MaskPositionsDataset(BaseWrapperDataset):
                     self.mask_idx,
                 )
 
-            assert not self.mask_whole_words, 'mask whole words not support in this dataset'
+            #assert not self.mask_whole_words, 'mask whole words not support in this dataset'
 
             if self.mask_whole_words is not None:
                 word_begins_mask = self.mask_whole_words.gather(0, item)
@@ -140,8 +140,8 @@ class MaskPositionsDataset(BaseWrapperDataset):
 
             if self.mask_position:
                 # mask 3 - 6 token
-                masked_positions = np.arange(1, 1 + sz) + self.pad_idx
-                new_item = np.full(sz, self.pad_idx)
+                masked_positions = np.arange(1, 1 + len(item)) + self.pad_idx
+                new_item = np.full(len(item), self.pad_idx)
 
                 num_position_mask = np.random.randint(4) + 3
                 num_position_mask = min(num_position_mask, sz)
@@ -153,12 +153,15 @@ class MaskPositionsDataset(BaseWrapperDataset):
 
                 retry = 0
                 while num_position_mask > 0 and retry < 10:
-                    #start_index = np.random.randint(sz - num_position_mask - 2) + 1
                     # front position has higher probability been mask. token 1 has 5 times probability then last word token.
                     start_index_probability = np.cumsum(-1*np.ones(sz - 2 - (num_position_mask - 1))) / (sz/2)
                     start_index_probability = softmax(start_index_probability)
                     start_index = np.random.choice(sz, 1, p=np.concatenate(([0], start_index_probability, [0] * num_position_mask)))[0]
                     end_index = start_index+num_position_mask
+
+                    if self.mask_whole_words is not None:
+                        start_index = word_begins_idx[start_index].item()
+                        end_index = word_begins_idx[end_index].item()
 
                     if mask[start_index:end_index].any():
                         retry = retry + 1
@@ -166,8 +169,9 @@ class MaskPositionsDataset(BaseWrapperDataset):
 
                     new_item[start_index:end_index] = masked_positions[start_index:end_index] 
 
-                    unmask_position = np.random.rand(num_position_mask) < 0.15
-                    masked_positions[start_index:end_index][~unmask_position] = [0] * (num_position_mask - unmask_position.sum())
+                    #unmask_position = np.random.rand(num_position_mask) < 0.15
+                    #masked_positions[start_index:end_index][~unmask_position] = [0] * (num_position_mask - unmask_position.sum())
+                    masked_positions[start_index:end_index] = [0] * (end_index - start_index)
                     break
 
                 if self.return_positions:

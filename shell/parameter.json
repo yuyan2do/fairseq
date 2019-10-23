@@ -11,7 +11,7 @@
         "tokens_per_sample": 512,
         "max_sentences": 16,
         "update_freq": 64,
-        "num_workers": 2,
+        "num_workers": 8,
         "fp16_init_scale": 8,
         "restore_file": "",
         "cuda_visible_devices": ""
