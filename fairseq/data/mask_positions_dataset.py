@@ -171,6 +171,9 @@ class MaskPositionsDataset(BaseWrapperDataset):
                         # start_index_probability = np.cumsum(-1*np.ones(sz - 2 - (num_position_mask - 1))) / (sz/2)
                         # start_index_probability = softmax(start_index_probability)
                         # start_index = np.random.choice(sz, 1, p=np.concatenate(([0], start_index_probability, [0] * num_position_mask)))[0]
+                        if sz - position_span - 1 < 3:
+                            break
+
                         start_index = np.random.choice(sz - position_span - 1, 1)[0] + 1
                         end_index = start_index+position_span
 
