@@ -67,12 +67,15 @@ class MaskPositionsDataset(BaseWrapperDataset):
         freq_weighted_replacement: bool = False,
         mask_whole_words: torch.Tensor = None,
         mask_position: bool = False,
+        mask_position_prob: float = 0.05,
+        geo_distribution_prob: float = 0.125,
         return_positions: bool = False,
     ):
         assert 0.0 < mask_prob < 1.0
         assert 0.0 <= random_token_prob <= 1.0
         assert 0.0 <= leave_unmasked_prob <= 1.0
         assert random_token_prob + leave_unmasked_prob <= 1.0
+        assert 0.0 < mask_position_prob < 1.0
 
         self.dataset = dataset
         self.vocab = vocab
@@ -85,7 +88,9 @@ class MaskPositionsDataset(BaseWrapperDataset):
         self.random_token_prob = random_token_prob
         self.mask_whole_words = mask_whole_words
         self.mask_position = mask_position
+        self.mask_position_prob = mask_position_prob
         self.return_positions = return_positions
+        self.geo = torch.distributions.geometric.Geometric(geo_distribution_prob)
 
         if random_token_prob > 0.0:
             if freq_weighted_replacement:
@@ -143,36 +148,46 @@ class MaskPositionsDataset(BaseWrapperDataset):
                 masked_positions = np.arange(1, 1 + len(item)) + self.pad_idx
                 new_item = np.full(len(item), self.pad_idx)
 
-                num_position_mask = np.random.randint(4) + 3
-                num_position_mask = min(num_position_mask, sz)
-                if num_position_mask <= 1 or sz - num_position_mask <= 3:
-                    num_position_mask = 0
 
-                def softmax(x):
-                    return np.exp((x - max(x))) / sum(np.exp((x - max(x))))
+                # def softmax(x):
+                #    return np.exp((x - max(x))) / sum(np.exp((x - max(x))))
 
-                retry = 0
-                while num_position_mask > 0 and retry < 10:
-                    # front position has higher probability been mask. token 1 has 5 times probability then last word token.
-                    start_index_probability = np.cumsum(-1*np.ones(sz - 2 - (num_position_mask - 1))) / (sz/2)
-                    start_index_probability = softmax(start_index_probability)
-                    start_index = np.random.choice(sz, 1, p=np.concatenate(([0], start_index_probability, [0] * num_position_mask)))[0]
-                    end_index = start_index+num_position_mask
+                num_position_mask = int(
+                    # add a random number for probabilistic rounding
+                    self.mask_position_prob * sz + np.random.rand()
+                )
 
-                    if self.mask_whole_words is not None:
-                        start_index = word_begins_idx[start_index].item()
-                        end_index = word_begins_idx[end_index].item()
+                position_span_list = [0]
+                while sum(position_span_list) < num_position_mask:
+                   position_span = np.clip(int(self.geo.sample().item()) + 1, 1, 12)
+                   position_span_list.append(position_span)
 
-                    if mask[start_index:end_index].any():
-                        retry = retry + 1
-                        continue
+                position_span_list = np.sort(position_span_list)[::-1]
 
-                    new_item[start_index:end_index] = masked_positions[start_index:end_index] 
+                for position_span in position_span_list:
+                    retry = 0
+                    while position_span > 0 and retry < 10:
+                        # front position has higher probability been mask. token 1 has 5 times probability then last word token.
+                        # start_index_probability = np.cumsum(-1*np.ones(sz - 2 - (num_position_mask - 1))) / (sz/2)
+                        # start_index_probability = softmax(start_index_probability)
+                        # start_index = np.random.choice(sz, 1, p=np.concatenate(([0], start_index_probability, [0] * num_position_mask)))[0]
+                        start_index = np.random.choice(sz - position_span - 1, 1)[0] + 1
+                        end_index = start_index+position_span
 
-                    #unmask_position = np.random.rand(num_position_mask) < 0.15
-                    #masked_positions[start_index:end_index][~unmask_position] = [0] * (num_position_mask - unmask_position.sum())
-                    masked_positions[start_index:end_index] = [0] * (end_index - start_index)
-                    break
+                        if self.mask_whole_words is not None:
+                            start_index = word_begins_idx[start_index].item()
+                            end_index = word_begins_idx[end_index].item()
+
+                        if mask[start_index:end_index].any() and (masked_positions[start_index:end_index] == 0).any():
+                            retry = retry + 1
+                            continue
+
+                        new_item[start_index:end_index] = masked_positions[start_index:end_index] 
+
+                        #unmask_position = np.random.rand(num_position_mask) < 0.15
+                        #masked_positions[start_index:end_index][~unmask_position] = [0] * (num_position_mask - unmask_position.sum())
+                        masked_positions[start_index:end_index] = [0] * (end_index - start_index)
+                        break
 
                 if self.return_positions:
                     return torch.from_numpy(new_item)

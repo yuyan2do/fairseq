@@ -54,6 +54,10 @@ class MaskedPositionTask(FairseqTask):
                             help='sample random replacement words based on word frequencies')
         parser.add_argument('--mask-whole-words', default=False, action='store_true',
                             help='mask whole words; you may also want to set --bpe')
+        parser.add_argument('--mask-position-prob', default=0.05, type=float,
+                            help='probability of replacing a token position with mask')
+        parser.add_argument('--geo-distribution-prob', default=0.15, type=float,
+                            help='probability of replacing a token with mask')
 
     def __init__(self, args, dictionary):
         super().__init__(args)
@@ -139,6 +143,8 @@ class MaskedPositionTask(FairseqTask):
             random_token_prob=self.args.random_token_prob,
             freq_weighted_replacement=self.args.freq_weighted_replacement,
             mask_whole_words=mask_whole_words,
+            mask_position_prob=self.args.mask_position_prob,
+            geo_distribution_prob=self.args.geo_distribution_prob,
         )
         src_dataset.set_epoch(epoch)
         tgt_dataset.set_epoch(epoch)
