@@ -159,8 +159,11 @@ class MaskPositionsDataset(BaseWrapperDataset):
 
                 position_span_list = [0]
                 while sum(position_span_list) < num_position_mask:
-                   position_span = np.clip(int(self.geo.sample().item()) + 1, 1, 12)
-                   position_span_list.append(position_span)
+                    position_span = np.clip(int(self.geo.sample().item()) + 1, 1, 12)
+                    position_span_list.append(position_span)
+
+                if np.random.rand() <= 0.5:
+                    position_span_list.pop()
 
                 position_span_list = np.sort(position_span_list)[::-1]
 

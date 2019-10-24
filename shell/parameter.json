@@ -24,11 +24,13 @@
     },
     "dgx_continue_train": {
         "max_sentences": 32,
-        "update_freq": 8
+        "update_freq": 8,
+        "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
     },
     "dgx_continue_train_4gpu": {
         "max_sentences": 32,
-        "update_freq": 16
+        "update_freq": 16,
+        "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
     },
     "v100_4gpu_continue_train": {
         "max_sentences": 16,
