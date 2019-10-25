@@ -132,7 +132,7 @@ class MaskedPositionTask(FairseqTask):
         else:
             mask_whole_words = None
 
-        src_dataset, tgt_dataset, src_positions, tgt_positions = MaskPositionsDataset.apply_mask(
+        src_dataset, tgt_dataset, src_positions, tgt_positions, src_start_boundary, src_end_boundary = MaskPositionsDataset.apply_mask(
             dataset,
             self.source_dictionary,
             pad_idx=self.source_dictionary.pad(),
@@ -167,6 +167,16 @@ class MaskedPositionTask(FairseqTask):
                         'src_lengths': NumelDataset(src_dataset, reduce=False),
                         'src_positions': PadDataset(
                             src_positions,
+                            pad_idx=self.source_dictionary.pad(),
+                            left_pad=False,
+                        ),
+                        'src_start_boundary': PadDataset(
+                            src_start_boundary,
+                            pad_idx=self.source_dictionary.pad(),
+                            left_pad=False,
+                        ),
+                        'src_end_boundary': PadDataset(
+                            src_end_boundary,
                             pad_idx=self.source_dictionary.pad(),
                             left_pad=False,
                         ),

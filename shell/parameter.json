@@ -36,5 +36,10 @@
         "max_sentences": 16,
         "update_freq": 32,
         "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
+    },
+    "v100_2gpu_continue_train": {
+        "max_sentences": 16,
+        "update_freq": 64,
+        "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
     }
 }

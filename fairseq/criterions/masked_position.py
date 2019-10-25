@@ -47,8 +47,7 @@ class MaskedPositionLoss(FairseqCriterion):
         if position_sample_size == 0:
             masked_positions = None
 
-        positions = sample['net_input']['src_positions']
-        logits, extra = model(**sample['net_input'], masked_tokens=masked_tokens, masked_positions=masked_positions, positions=positions)
+        logits, extra = model(**sample['net_input'], masked_tokens=masked_tokens, masked_positions=masked_positions)
         position_logits = extra['position_logits']
 
         targets = model.get_targets(sample, [logits])

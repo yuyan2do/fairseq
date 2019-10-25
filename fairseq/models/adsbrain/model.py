@@ -82,6 +82,8 @@ class AdsbrainRobertaModel(FairseqLanguageModel):
                             help='enable to fill averagte positoin embedding for masked position')
         parser.add_argument('--dynamic-constrain-visibility', action='store_true',
                             help='enable to dynamic contrain visibility')
+        parser.add_argument('--constrain-predict-range', action='store_true',
+                            help='enable constrain predict range, predict only on masked position')
 
     @classmethod
     def build_model(cls, args, task):
@@ -194,7 +196,7 @@ class AdsbrainRobertaModel(FairseqLanguageModel):
 class RobertaLMHead(nn.Module):
     """Head for masked language modeling."""
 
-    def __init__(self, embed_dim, output_dim, activation_fn, weight=None):
+    def __init__(self, embed_dim, output_dim, activation_fn, weight=None, constrain_predict_range=False):
         super().__init__()
         self.dense = nn.Linear(embed_dim, embed_dim)
         self.activation_fn = utils.get_activation_fn(activation_fn)
@@ -204,6 +206,7 @@ class RobertaLMHead(nn.Module):
             weight = nn.Linear(embed_dim, output_dim, bias=False).weight
         self.weight = weight
         self.bias = nn.Parameter(torch.zeros(output_dim))
+        self.constrain_predict_range = constrain_predict_range
 
     def forward(self, features, masked_tokens=None, **kwargs):
         # Only project the unmasked tokens while training,
@@ -216,6 +219,20 @@ class RobertaLMHead(nn.Module):
         x = self.layer_norm(x)
         # project back to size of vocabulary with bias
         x = F.linear(x, self.weight) + self.bias
+
+        if masked_tokens is not None and self.constrain_predict_range:
+            with torch.no_grad():
+                batch_size, seqence_len = masked_tokens.size()
+                pad_masked_tokens = (F.pad(input=masked_tokens, pad=(2,x.size()[-1]-2-seqence_len), mode='constant', value=0).float() + 1e-45).log().type_as(x)
+                placehold = torch.zeros_like(x)
+                candidate_size = masked_tokens.int().sum(dim=-1)
+                shift = 0
+                for i in range(batch_size):
+                    placehold[shift : shift + candidate_size[i]].add_(pad_masked_tokens[i])
+                    shift += candidate_size[i]
+            assert (shift == x.size()[0]), 'restric predict range not finish correct, shift != x.size()[0]'
+            x += placehold
+        
         return x
 
 
@@ -282,9 +299,10 @@ class RobertaEncoder(FairseqDecoder):
             output_dim=self.sentence_encoder.embed_positions.num_embeddings,
             activation_fn=args.activation_fn,
             weight=self.sentence_encoder.embed_positions.weight,
+            constrain_predict_range=args.constrain_predict_range,
         )
 
-    def forward(self, src_tokens, features_only=False, return_all_hiddens=False, masked_tokens=None, masked_positions=None, positions=None, **unused):
+    def forward(self, src_tokens, features_only=False, return_all_hiddens=False, masked_tokens=None, masked_positions=None, src_positions=None, src_start_boundary=None, src_end_boundary=None, **unused):
         """
         Args:
             src_tokens (LongTensor): input tokens of shape `(batch, src_len)`
@@ -300,19 +318,23 @@ class RobertaEncoder(FairseqDecoder):
                 - a dictionary of additional data, where 'inner_states'
                   is a list of hidden states.
         """
-        x, extra = self.extract_features(src_tokens, return_all_hiddens, positions=positions, masked_positions=masked_positions)
+        x, extra = self.extract_features(src_tokens, return_all_hiddens, \
+            positions=src_positions, masked_positions=masked_positions, \
+            start_boundary=src_start_boundary, end_boundary=src_end_boundary)
         if not features_only:
             x_positions = self.output_position_layer(x, masked_positions=masked_positions)
             extra['position_logits'] = x_positions
             x = self.output_layer(x, masked_tokens=masked_tokens)
         return x, extra
 
-    def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, masked_positions=None, **unused):
+    def extract_features(self, src_tokens, return_all_hiddens=False, positions=None, masked_positions=None, start_boundary=None, end_boundary=None, **unused):
         inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
             positions=positions,
             masked_positions=masked_positions,
+            start_boundary=start_boundary,
+            end_boundary=end_boundary,
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None, \

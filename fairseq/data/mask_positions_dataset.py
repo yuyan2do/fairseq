@@ -51,6 +51,8 @@ class MaskPositionsDataset(BaseWrapperDataset):
             LRUCacheDataset(cls(dataset, *args, **kwargs, return_masked_tokens=True)),
             LRUCacheDataset(cls(dataset, *args, **kwargs, return_masked_tokens=False, mask_position=True, return_positions=False)),
             LRUCacheDataset(cls(dataset, *args, **kwargs, return_masked_tokens=False, mask_position=True, return_positions=True)),
+            LRUCacheDataset(cls(dataset, *args, **kwargs, return_masked_tokens=False, mask_position=True, return_start_boundary=True)),
+            LRUCacheDataset(cls(dataset, *args, **kwargs, return_masked_tokens=False, mask_position=True, return_end_boundary=True)),
         )
 
     def __init__(
@@ -70,6 +72,8 @@ class MaskPositionsDataset(BaseWrapperDataset):
         mask_position_prob: float = 0.05,
         geo_distribution_prob: float = 0.125,
         return_positions: bool = False,
+        return_start_boundary: bool = False,
+        return_end_boundary: bool = False,
     ):
         assert 0.0 < mask_prob < 1.0
         assert 0.0 <= random_token_prob <= 1.0
@@ -89,8 +93,10 @@ class MaskPositionsDataset(BaseWrapperDataset):
         self.mask_whole_words = mask_whole_words
         self.mask_position = mask_position
         self.mask_position_prob = mask_position_prob
+        self.geo_distribution_prob = geo_distribution_prob
         self.return_positions = return_positions
-        self.geo = torch.distributions.geometric.Geometric(geo_distribution_prob)
+        self.return_start_boundary = return_start_boundary
+        self.return_end_boundary = return_end_boundary
 
         if random_token_prob > 0.0:
             if freq_weighted_replacement:
@@ -148,6 +154,9 @@ class MaskPositionsDataset(BaseWrapperDataset):
                 masked_positions = np.arange(1, 1 + len(item)) + self.pad_idx
                 new_item = np.full(len(item), self.pad_idx)
 
+                if self.return_start_boundary or self.return_end_boundary:
+                    position_start_boundary = np.full(len(item), self.pad_idx)
+                    position_end_boundary = np.full(len(item), self.pad_idx)
 
                 # def softmax(x):
                 #    return np.exp((x - max(x))) / sum(np.exp((x - max(x))))
@@ -157,11 +166,13 @@ class MaskPositionsDataset(BaseWrapperDataset):
                     self.mask_position_prob * sz + np.random.rand()
                 )
 
-                position_span_list = [0]
-                while sum(position_span_list) < num_position_mask:
-                    position_span = np.clip(int(self.geo.sample().item()) + 1, 1, 12)
-                    position_span_list.append(position_span)
-
+                position_span_array = np.random.geometric(p=self.geo_distribution_prob, size=int(num_position_mask * self.geo_distribution_prob + 5))
+                position_span_list = [0] + list(np.clip(position_span_array, 1, 12))
+                position_span_sum = sum(position_span_list)
+                while position_span_sum - position_span_list[-1] > num_position_mask:
+                    position_span_sum -= position_span_list[-1]
+                    position_span_list.pop()
+                    
                 if np.random.rand() <= 0.5:
                     position_span_list.pop()
 
@@ -188,12 +199,19 @@ class MaskPositionsDataset(BaseWrapperDataset):
                             retry = retry + 1
                             continue
 
-                        new_item[start_index:end_index] = masked_positions[start_index:end_index] 
+                        if self.return_start_boundary or self.return_end_boundary:
+                            position_start_boundary[start_index:end_index] = start_index + 2
+                            position_end_boundary[start_index:end_index] = end_index - 1 + 2
 
-                        #unmask_position = np.random.rand(num_position_mask) < 0.15
-                        #masked_positions[start_index:end_index][~unmask_position] = [0] * (num_position_mask - unmask_position.sum())
+                        new_item[start_index:end_index] = masked_positions[start_index:end_index] 
                         masked_positions[start_index:end_index] = [0] * (end_index - start_index)
                         break
+
+                if self.return_start_boundary:
+                    return torch.from_numpy(position_start_boundary)
+
+                if self.return_end_boundary:
+                    return torch.from_numpy(position_end_boundary)
 
                 if self.return_positions:
                     return torch.from_numpy(new_item)

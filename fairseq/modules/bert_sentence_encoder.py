@@ -180,6 +180,8 @@ class BertSentenceEncoder(nn.Module):
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
         masked_positions: Optional[torch.Tensor] = None,
+        start_boundary: Optional[torch.Tensor] = None,
+        end_boundary: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
 
         batch_size, seq_len = tokens.size()
@@ -202,12 +204,11 @@ class BertSentenceEncoder(nn.Module):
         if self.embed_positions is not None:
             position_embed = self.embed_positions(tokens, positions=positions)
             if masked_positions is not None and self.fill_avg_position_weight:
-                with torch.no_grad():
-                    masked_span_positions = ((self.static_positions[None,:seq_len] * masked_positions.int()) + self.padding_idx).long()
-                    masked_span_embed = self.embed_positions(tokens, positions=masked_span_positions).sum(dim=-2)
-                    masked_span_embed = masked_span_embed / masked_positions.int().sum(dim=-1).type_as(masked_span_embed)[:,None]
-                    for i in range(batch_size):
-                        position_embed[i, masked_positions[i]] = masked_span_embed[i]
+                assert start_boundary is not None and end_boundary is not None, "fill_avg_position_weight, but boundary not pass in"
+                start_boundary_embed = self.embed_positions(tokens, positions=start_boundary)
+                end_boundary_embed = self.embed_positions(tokens, positions=end_boundary)
+                position_embed += (start_boundary_embed + end_boundary_embed) / 2
+
             x = token_embed + position_embed
         else:
             x = token_embed + 0
