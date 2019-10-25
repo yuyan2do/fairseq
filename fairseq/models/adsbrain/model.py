@@ -299,7 +299,7 @@ class RobertaEncoder(FairseqDecoder):
             output_dim=self.sentence_encoder.embed_positions.num_embeddings,
             activation_fn=args.activation_fn,
             weight=self.sentence_encoder.embed_positions.weight,
-            constrain_predict_range=args.constrain_predict_range,
+            constrain_predict_range=getattr(self.args, 'args.constrain_predict_range', False),
         )
 
     def forward(self, src_tokens, features_only=False, return_all_hiddens=False, masked_tokens=None, masked_positions=None, src_positions=None, src_start_boundary=None, src_end_boundary=None, **unused):
