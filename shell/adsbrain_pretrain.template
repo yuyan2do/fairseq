@@ -33,6 +33,7 @@ FP16_INIT_SCALE=$fp16_init_scale
 
 $cuda_visible_devices_command
 fairseq-train --fp16 $DATA_DIR $restore_file_command \
+    --memory-efficient-fp16 \
     --task masked_position --criterion masked_position \
     --arch adsbrain_roberta_base --sample-break-mode complete \
     --tokens-per-sample $TOKENS_PER_SAMPLE \

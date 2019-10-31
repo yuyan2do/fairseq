@@ -167,7 +167,7 @@ class MaskPositionsDataset(BaseWrapperDataset):
                 )
 
                 position_span_array = np.random.geometric(p=self.geo_distribution_prob, size=int(num_position_mask * self.geo_distribution_prob + 5))
-                position_span_list = [0] + list(np.clip(position_span_array, 1, 12))
+                position_span_list = [0] + list(np.clip(position_span_array, 1, 8))
                 position_span_sum = sum(position_span_list)
                 while position_span_sum - position_span_list[-1] > num_position_mask:
                     position_span_sum -= position_span_list[-1]

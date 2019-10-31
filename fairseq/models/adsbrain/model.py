@@ -221,17 +221,23 @@ class RobertaLMHead(nn.Module):
         x = F.linear(x, self.weight) + self.bias
 
         if masked_tokens is not None and self.constrain_predict_range:
+            '''
             with torch.no_grad():
                 batch_size, seqence_len = masked_tokens.size()
                 pad_masked_tokens = (F.pad(input=masked_tokens, pad=(2,x.size()[-1]-2-seqence_len), mode='constant', value=0).float() + 1e-45).log().type_as(x)
-                placehold = torch.zeros_like(x)
                 candidate_size = masked_tokens.int().sum(dim=-1)
+                placehold = torch.zeros_like(x)
                 shift = 0
                 for i in range(batch_size):
                     placehold[shift : shift + candidate_size[i]].add_(pad_masked_tokens[i])
                     shift += candidate_size[i]
-            assert (shift == x.size()[0]), 'restric predict range not finish correct, shift != x.size()[0]'
-            x += placehold
+            # assert (shift == x.size()[0]), 'restric predict range not finish correct, shift != x.size()[0]'
+            # x += placehold
+            '''
+            batch_size, seqence_len = masked_tokens.size()
+            pad_masked_tokens = (F.pad(input=masked_tokens, pad=(2,x.size()[-1]-2-seqence_len), mode='constant', value=0).float() + 1e-45).log().type_as(x)
+            duplicate_cnt = (masked_tokens.long() * torch.arange(batch_size).unsqueeze(-1))[masked_tokens]
+            x += pad_masked_tokens[duplicate_cnt]
         
         return x
 
