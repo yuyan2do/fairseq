@@ -26,9 +26,14 @@ class AverageMeter(object):
     def __it__(self, other):
         return self.avg < other.avg
 
+    def __ie__(self, other):
+        return self.avg <= other.avg
+
     def __gt__(self, other):
         return self.avg > other.avg
 
+    def __ge__(self, other):
+        return self.avg >= other.avg
 
 class TimeMeter(object):
     """Computes the average occurrence of some event per second"""
