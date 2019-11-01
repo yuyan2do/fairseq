@@ -111,10 +111,17 @@ class MaskedPositionLoss(FairseqCriterion):
             reduction='sum',
             ignore_index=self.padding_idx,
         )
-        sample_size = token_sample_size + position_sample_size
-        loss = token_loss + position_loss + token_pick_loss
+
+        if (position_loss + token_pick_loss) > 0.125 * token_loss:
+            auxiliary_loss_adjust_ratio =  (0.125 * token_loss.data.item()) / (position_loss.data.item() + token_pick_loss.data.item())
+        else:
+            auxiliary_loss_adjust_ratio = 1.0
+
+        sample_size = token_sample_size + auxiliary_loss_adjust_ratio * position_sample_size
+        loss = token_loss + auxiliary_loss_adjust_ratio * (position_loss + token_pick_loss)
 
         logging_output = {
+            'auxiliary_loss_adjust_ratio': utils.item(auxiliary_loss_adjust_ratio) if reduce else auxiliary_loss_adjust_ratio,
             'token_loss': utils.item(token_loss.data) if reduce else token_loss.data,
             'position_loss': utils.item(position_loss.data) if reduce else position_loss.data,
             'token_pick_loss': utils.item(token_pick_loss.data) if reduce else token_pick_loss.data,
@@ -135,6 +142,8 @@ class MaskedPositionLoss(FairseqCriterion):
     @staticmethod
     def aggregate_logging_outputs(logging_outputs):
         """Aggregate logging outputs from data parallel training."""
+        auxiliary_loss_adjust_ratio = [log.get('auxiliary_loss_adjust_ratio', 0) for log in logging_outputs]
+        auxiliary_loss_adjust_ratio = sum(auxiliary_loss_adjust_ratio) / len(auxiliary_loss_adjust_ratio)
         token_loss = sum(log.get('token_loss', 0) for log in logging_outputs)
         position_loss = sum(log.get('position_loss', 0) for log in logging_outputs)
         token_pick_loss = sum(log.get('token_pick_loss', 0) for log in logging_outputs)
@@ -148,6 +157,7 @@ class MaskedPositionLoss(FairseqCriterion):
         token_pick_correct_num = sum(log.get('token_pick_correct_num', 0) for log in logging_outputs)
 
         agg_output = {
+            'auxiliary_loss_adjust_ratio': auxiliary_loss_adjust_ratio,
             'token_loss': token_loss / token_sample_size / math.log(2),
             'position_loss': position_loss / max(1, position_sample_size) / math.log(2),
             'token_pick_loss': token_pick_loss / max(1, position_sample_size) / math.log(2),

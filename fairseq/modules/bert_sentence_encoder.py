@@ -153,8 +153,6 @@ class BertSentenceEncoder(nn.Module):
         else:
             self.emb_layer_norm = None
 
-        self.static_positions = (torch.cumsum(torch.ones(self.max_seq_len), dim=0).int()).detach()
-
         # Apply initialization of model params after building the model
         if self.apply_bert_init:
             self.apply(init_bert_params)
@@ -196,18 +194,15 @@ class BertSentenceEncoder(nn.Module):
             token_embed *= self.embed_scale
 
         position_embed = None
-        if tokens.is_cuda and not self.static_positions.is_cuda:
-            # TODO make it as a buffer to avoid this manual move
-            self.static_positions = self.static_positions.cuda(tokens.get_device())
-            print("######### " + str(self.static_positions.get_device()))
 
         if self.embed_positions is not None:
             position_embed = self.embed_positions(tokens, positions=positions)
             if masked_positions is not None and self.fill_avg_position_weight:
                 assert start_boundary is not None and end_boundary is not None, "fill_avg_position_weight, but boundary not pass in"
-                start_boundary_embed = self.embed_positions(tokens, positions=start_boundary)
-                end_boundary_embed = self.embed_positions(tokens, positions=end_boundary)
-                position_embed += (start_boundary_embed + end_boundary_embed) / 2
+                start_boundary_embed = self.embed_positions(tokens, positions=start_boundary[masked_positions])
+                end_boundary_embed = self.embed_positions(tokens, positions=end_boundary[masked_positions])
+                masked_position_embed = (start_boundary_embed + end_boundary_embed) / 2
+                position_embed[masked_positions] = masked_position_embed
 
             x = token_embed + position_embed
         else:
