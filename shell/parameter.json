@@ -16,6 +16,13 @@
         "restore_file": "",
         "cuda_visible_devices": ""
     },
+    "dgx2_pretrain": {
+        "max_epoch": 36,
+        "peak_lr": 0.001,
+        "total_updates": 125000,
+        "max_sentences": 32,
+        "update_freq": 4
+    },
     "dgx_pretrain": {
         "peak_lr": 0.001,
         "total_updates": 35650,
