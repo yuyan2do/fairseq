@@ -20,6 +20,7 @@
         "max_epoch": 36,
         "peak_lr": 0.001,
         "total_updates": 125000,
+        "warmup_updates": 24000,
         "max_sentences": 32,
         "update_freq": 4
     },
@@ -27,6 +28,7 @@
         "max_epoch": 36,
         "peak_lr": 0.001,
         "total_updates": 125000,
+        "warmup_updates": 24000,
         "max_sentences": 32,
         "update_freq": 8
     },
