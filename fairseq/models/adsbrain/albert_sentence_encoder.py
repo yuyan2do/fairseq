@@ -185,7 +185,11 @@ class AlbertSentenceEncoder(nn.Module):
         segment_labels: torch.Tensor = None,
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
+        execute_times: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
+
+        if execute_times is None:
+            execute_times = self.num_encoder_layers
 
         # compute padding mask. This is needed for multi-head attention
         padding_mask = tokens.eq(self.padding_idx)
@@ -222,7 +226,7 @@ class AlbertSentenceEncoder(nn.Module):
         if not last_state_only:
             inner_states.append(x)
 
-        for i in range(self.num_encoder_layers):
+        for i in range(execute_times):
             x, _ = self.layer(x, self_attn_padding_mask=padding_mask, layer=i)
             if not last_state_only:
                 inner_states.append(x)

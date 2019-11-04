@@ -297,22 +297,29 @@ class AlbertEncoder(FairseqDecoder):
                 - a dictionary of additional data, where 'inner_states'
                   is a list of hidden states.
         """
-        x, extra = self.extract_features(src_tokens, return_all_hiddens)
+        x, extra = self.extract_features(src_tokens, return_all_hiddens, masked_tokens=masked_tokens)
         if not features_only:
-            x_mlm, x_dicriminant = self.output_layer(x, masked_tokens=masked_tokens)
-            return x_mlm, x_dicriminant
+            x = self.output_layer(x, masked_tokens=masked_tokens)
         return x, extra
 
-    def extract_features(self, src_tokens, return_all_hiddens=False, **unused):
+    def extract_features(self, src_tokens, return_all_hiddens=False, masked_tokens=None, **unused):
+        execute_times = None
+        if masked_tokens is not None:
+            execute_times = 4
+
         inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
+            execute_times=execute_times,
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None}
 
     def output_layer(self, features, masked_tokens=None, **unused):
-        return self.lm_head(features, masked_tokens), self.discriminant_head(features)
+        if masked_tokens is not None:
+            return self.lm_head(features, masked_tokens)
+        else:
+            return self.discriminant_head(features)
 
     def max_positions(self):
         """Maximum output length supported by the encoder."""

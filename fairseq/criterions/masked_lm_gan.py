@@ -21,7 +21,7 @@ class MaskedLmGanLoss(FairseqCriterion):
 
     def __init__(self, args, task):
         super().__init__(args, task)
-        self.loss_lambda = 1
+        self.loss_lambda = 0.1
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -39,23 +39,26 @@ class MaskedLmGanLoss(FairseqCriterion):
         if sample_size == 0:
             masked_tokens = None
 
-        logits_mlm, logits_dicriminant = model(**sample['net_input'], masked_tokens=masked_tokens)
+        logits_mlm = model(**sample['net_input'], masked_tokens=masked_tokens)[0]
 
         targets_mlm = model.get_targets(sample, [logits_mlm])
         targets_dicriminant = torch.ones_like(masked_tokens, dtype=torch.long, device=masked_tokens.get_device())
 
         if sample_size != 0:
             targets_mlm = targets_mlm[masked_tokens]
-            match_mlm = (targets_mlm == torch.argmax(logits_mlm, dim=-1))
+            predict_token = torch.argmax(logits_mlm, dim=-1)
+            match_mlm = (targets_mlm == predict_token)
             targets_dicriminant[masked_tokens][~match_mlm] = 0
             match_mlm_cnt = match_mlm.sum().item()
+
+            # print('before', sample['net_input']['src_tokens'][masked_tokens])
+            gan_token = sample['net_input']['src_tokens'].detach().clone()
+            gan_token[masked_tokens] = predict_token
+            # print('after', gan_token[masked_tokens])
         else:
             match_mlm_cnt = 0
 
-        targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
-
-        match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
-
+        mlm_sample_size = sample_size
         loss_mlm = F.nll_loss(
             F.log_softmax(
                 logits_mlm.view(-1, logits_mlm.size(-1)),
@@ -68,23 +71,33 @@ class MaskedLmGanLoss(FairseqCriterion):
         )
 
 
-        loss_dicriminant = F.nll_loss(
-            F.log_softmax(
-                logits_dicriminant.view(-1, logits_dicriminant.size(-1)),
-                dim=-1,
-                dtype=torch.float32,
-            ),
-            targets_dicriminant.view(-1),
-            reduction='sum',
-            ignore_index=2,
-        )
+        loss = loss_mlm
+        if float(match_mlm_cnt) / mlm_sample_size > 0.3:
+            logits_dicriminant = model(gan_token)[0]
 
-        if loss_dicriminant < 0.1:
-            self.loss_lambda = 7
+            targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
+            match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
 
-        loss = loss_mlm + self.loss_lambda * loss_dicriminant
+            loss_dicriminant = F.nll_loss(
+                F.log_softmax(
+                    logits_dicriminant.view(-1, logits_dicriminant.size(-1)),
+                    dim=-1,
+                    dtype=torch.float32,
+                ),
+                targets_dicriminant.view(-1),
+                reduction='sum',
+                ignore_index=2,
+            )
 
-        mlm_sample_size = sample_size
+            if loss_dicriminant < 0.1:
+                self.loss_lambda = 7
+
+            loss += self.loss_lambda * loss_dicriminant
+        else:
+            match_dicriminant_cnt = 0
+            loss_dicriminant = torch.tensor(0)
+
+
         sample_size = mlm_sample_size
         # sample_size = mlm_sample_size + sample['ntokens']
         logging_output = {
