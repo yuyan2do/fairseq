@@ -5,3 +5,4 @@
 
 from .hub_interface import *  # noqa
 from .model import *  # noqa
+from .albert_model import *  # noqa

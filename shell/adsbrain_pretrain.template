@@ -9,6 +9,9 @@ export PATH="$HOME/.local/bin:$PATH"
 
 
 EXP_NAME=$exp_name
+TASK=$task
+CRITERION=$criterion
+ARCH=$arch
 
 
 DATA_DIR=$data_dir
@@ -34,8 +37,8 @@ FP16_INIT_SCALE=$fp16_init_scale
 $cuda_visible_devices_command
 fairseq-train --fp16 $DATA_DIR $restore_file_command \
     --memory-efficient-fp16 \
-    --task masked_position --criterion masked_position \
-    --arch adsbrain_roberta_base --sample-break-mode complete \
+    --task $TASK --criterion $CRITERION \
+    --arch $ARCH --sample-break-mode complete \
     --tokens-per-sample $TOKENS_PER_SAMPLE \
     --optimizer adam --adam-betas "(0.9, 0.98)" --adam-eps 1e-6 --clip-norm 0.0 \
     --lr-scheduler polynomial_decay --lr $PEAK_LR --warmup-updates $WARMUP_UPDATES --total-num-update $TOTAL_UPDATES \
@@ -49,4 +52,6 @@ fairseq-train --fp16 $DATA_DIR $restore_file_command \
     --ddp-backend=no_c10d \
     --max-epoch $MAX_EPOCH \
     --max-update $TOTAL_UPDATES --log-format tqdm \
+    --bpe gpt2 --gpt2-encoder-json ~/data/bert_pretrain/gpt2_bpe/encoder.json \
+    --gpt2-vocab-bpe ~/data/bert_pretrain/gpt2_bpe/vocab.bpe \
     $extra_command

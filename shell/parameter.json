@@ -1,6 +1,9 @@
 {
     "common": {
         "exp_name": "exp_name_is_blank",
+        "task": "",
+        "criterion": "",
+        "arch": "",
         "data_dir": "~/data/bert_pretrain/data-bin",
         "save_dir": "~/data/experiment/bert_base/${EXP_NAME}/checkpoints",
         "tensorboard_logdir": "~/tensorboard/${DLWS_JOB_ID}/logs/${EXP_NAME}",
@@ -17,6 +20,14 @@
         "cuda_visible_devices": ""
     },
     "dgx2_pretrain": {
+        "max_epoch": 36,
+        "peak_lr": 0.001,
+        "total_updates": 125000,
+        "warmup_updates": 24000,
+        "max_sentences": 32,
+        "update_freq": 4
+    },
+    "dgx2_pretrain_albert": {
         "max_epoch": 36,
         "peak_lr": 0.001,
         "total_updates": 125000,
@@ -41,6 +52,14 @@
         "max_sentences": 32,
         "update_freq": 16,
         "restore_file": "~/data/roberta.base/adsbrain_model_position_head.pt"
+    },
+    "v100_4gpu_pretrain": {
+        "max_epoch": 36,
+        "peak_lr": 0.001,
+        "total_updates": 125000,
+        "warmup_updates": 24000,
+        "max_sentences": 16,
+        "update_freq": 32
     },
     "v100_4gpu_continue_train": {
         "max_sentences": 16,

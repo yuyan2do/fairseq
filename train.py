@@ -105,7 +105,7 @@ def main(args, init_distributed=False):
 
         reload_dataset = ':' in getattr(args, 'data', '')
         # sharded data: get train iterator for next epoch
-        epoch_itr = trainer.get_train_iterator(epoch_itr.epoch, load_dataset=True)
+        epoch_itr = trainer.get_train_iterator(epoch_itr.epoch, load_dataset=reload_dataset)
     train_meter.stop()
     print('| done training in {:.1f} seconds'.format(train_meter.sum))
 

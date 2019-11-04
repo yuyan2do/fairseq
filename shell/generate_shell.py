@@ -15,6 +15,9 @@ parameter = data['common']
 
 parser = argparse.ArgumentParser(description='Process some integers.')
 parser.add_argument('--exp_name', default='', required=True, type=str, help='')
+parser.add_argument('--task', default='', required=True, type=str, help='')
+parser.add_argument('--criterion', default='', required=True, type=str, help='')
+parser.add_argument('--arch', default='', required=True, type=str, help='')
 parser.add_argument('--parameter_group', default='', type=str, help='')
 parser.add_argument('--restore_file', default='', type=str, help='')
 parser.add_argument('--cuda_visible_devices', default='', type=str, help='')
@@ -27,6 +30,9 @@ if args.parameter_group:
         parameter[k] = v
 
 parameter['exp_name']= args.exp_name
+parameter['task']= args.task
+parameter['criterion']= args.criterion
+parameter['arch']= args.arch
 
 if args.cuda_visible_devices:
     parameter['cuda_visible_devices'] = args.cuda_visible_devices
