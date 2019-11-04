@@ -337,6 +337,11 @@ def base_architecture(args):
     args.pooler_dropout = getattr(args, 'pooler_dropout', 0.0)
 
 
+@register_model_architecture('adsbrain_albert', 'adsbrain_albert_small')
+def albert_base_architecture(args):
+    args.encoder_layers = getattr(args, 'encoder_layers', 1)
+    base_architecture(args)
+
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_base')
 def albert_base_architecture(args):
     base_architecture(args)

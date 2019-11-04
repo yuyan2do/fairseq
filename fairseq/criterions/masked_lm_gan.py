@@ -21,6 +21,7 @@ class MaskedLmGanLoss(FairseqCriterion):
 
     def __init__(self, args, task):
         super().__init__(args, task)
+        self.loss_lambda = 1
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -45,8 +46,8 @@ class MaskedLmGanLoss(FairseqCriterion):
 
         if sample_size != 0:
             targets_mlm = targets_mlm[masked_tokens]
-            match_mlm = (targets_mlm == torch.argmax(logits_mlm, dim=-1)).type(targets_dicriminant.dtype)
-            targets_dicriminant[masked_tokens] = match_mlm
+            match_mlm = (targets_mlm == torch.argmax(logits_mlm, dim=-1))
+            targets_dicriminant[masked_tokens][~match_mlm] = 0
             match_mlm_cnt = match_mlm.sum().item()
         else:
             match_mlm_cnt = 0
@@ -54,8 +55,6 @@ class MaskedLmGanLoss(FairseqCriterion):
         targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
 
         match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
-        # print('targets_dicriminant', targets_dicriminant[0,:20])
-        # print('logits_dicriminant', logits_dicriminant[0, :20, :])
 
         loss_mlm = F.nll_loss(
             F.log_softmax(
@@ -80,12 +79,14 @@ class MaskedLmGanLoss(FairseqCriterion):
             ignore_index=2,
         )
 
-        # loss = loss_mlm + 50 * loss_dicriminant
-        loss = loss_mlm
-        # loss = 50 * loss_dicriminant
+        if loss_dicriminant < 0.1:
+            self.loss_lambda = 7
+
+        loss = loss_mlm + self.loss_lambda * loss_dicriminant
 
         mlm_sample_size = sample_size
-        sample_size = mlm_sample_size + sample['ntokens']
+        sample_size = mlm_sample_size
+        # sample_size = mlm_sample_size + sample['ntokens']
         logging_output = {
             'loss': utils.item(loss.data) if reduce else loss.data,
             'loss_mlm': utils.item(loss_mlm.data) if reduce else los_mlms.data,
@@ -95,8 +96,8 @@ class MaskedLmGanLoss(FairseqCriterion):
             'nsentences': sample['nsentences'],
             'sample_size': sample_size,
             'mlm_sample_size': mlm_sample_size,
-            'accuracy_mlm': float(match_mlm_cnt) / sample_size if sample_size != 0 else 0,
-            'accuracy_dicriminant': float(match_dicriminant_cnt) / sample['ntokens'] if sample['ntokens'] != 0 else 0,
+            'match_mlm_cnt': match_mlm_cnt,
+            'match_dicriminant_cnt': match_dicriminant_cnt,
         }
         return loss, sample_size, logging_output
 
