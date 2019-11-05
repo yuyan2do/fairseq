@@ -49,6 +49,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             predict_token = torch.argmax(logits_mlm, dim=-1)
             match_mlm = (targets_mlm == predict_token)
             targets_dicriminant[masked_tokens][~match_mlm] = 0
+            targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
             match_mlm_cnt = match_mlm.sum().item()
 
             # print('before', sample['net_input']['src_tokens'][masked_tokens])
@@ -72,10 +73,9 @@ class MaskedLmGanLoss(FairseqCriterion):
 
 
         loss = loss_mlm
-        if float(match_mlm_cnt) / mlm_sample_size > 0.3:
+        if float(match_mlm_cnt) / mlm_sample_size > 0.7:
             logits_dicriminant = model(gan_token)[0]
 
-            targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
             match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
 
             loss_dicriminant = F.nll_loss(

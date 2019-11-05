@@ -305,7 +305,7 @@ class AlbertEncoder(FairseqDecoder):
     def extract_features(self, src_tokens, return_all_hiddens=False, masked_tokens=None, **unused):
         execute_times = None
         if masked_tokens is not None:
-            execute_times = 4
+            execute_times = 6
 
         inner_states, _ = self.sentence_encoder(
             src_tokens,

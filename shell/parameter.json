@@ -21,7 +21,7 @@
     },
     "dgx2_pretrain": {
         "max_epoch": 36,
-        "peak_lr": 0.001,
+        "peak_lr": 0.0007,
         "total_updates": 125000,
         "warmup_updates": 24000,
         "max_sentences": 32,
@@ -29,7 +29,7 @@
     },
     "dgx2_pretrain_albert": {
         "max_epoch": 36,
-        "peak_lr": 0.001,
+        "peak_lr": 0.0007,
         "total_updates": 125000,
         "warmup_updates": 24000,
         "max_sentences": 32,
@@ -37,7 +37,7 @@
     },
     "dgx_pretrain": {
         "max_epoch": 36,
-        "peak_lr": 0.001,
+        "peak_lr": 0.0007,
         "total_updates": 125000,
         "warmup_updates": 24000,
         "max_sentences": 32,
