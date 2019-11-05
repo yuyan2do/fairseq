@@ -22,6 +22,7 @@ class MaskedLmGanLoss(FairseqCriterion):
     def __init__(self, args, task):
         super().__init__(args, task)
         self.loss_lambda = 0.1
+        self.enable_dicriminant = True
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -48,7 +49,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             targets_mlm = targets_mlm[masked_tokens]
             predict_token = torch.argmax(logits_mlm, dim=-1)
             match_mlm = (targets_mlm == predict_token)
-            targets_dicriminant[masked_tokens][~match_mlm] = 0
+            targets_dicriminant[masked_tokens] = match_mlm.long()
             targets_dicriminant[sample['net_input']['src_tokens'].eq(self.padding_idx)] = 2
             match_mlm_cnt = match_mlm.sum().item()
 
@@ -73,7 +74,10 @@ class MaskedLmGanLoss(FairseqCriterion):
 
 
         loss = loss_mlm
-        if float(match_mlm_cnt) / mlm_sample_size > 0.7:
+        # if float(match_mlm_cnt) / mlm_sample_size > 0.5:
+        #    self.enable_dicriminant = True
+
+        if self.enable_dicriminant:
             logits_dicriminant = model(gan_token)[0]
 
             match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
@@ -89,8 +93,8 @@ class MaskedLmGanLoss(FairseqCriterion):
                 ignore_index=2,
             )
 
-            if loss_dicriminant < 0.1:
-                self.loss_lambda = 7
+            if loss_dicriminant < 0.2:
+                self.loss_lambda = 50
 
             loss += self.loss_lambda * loss_dicriminant
         else:
@@ -130,7 +134,7 @@ class MaskedLmGanLoss(FairseqCriterion):
         agg_output = {
             'loss': loss / sample_size / math.log(2),
             'loss_mlm': loss_mlm / mlm_sample_size / math.log(2),
-            'loss_dicriminant': loss_dicriminant / ntokens / math.log(2),
+            'loss_dicriminant': loss_dicriminant / ntokens / math.log(2) if ntokens > 0 else 0.,
             'nll_loss': sum(log.get('nll_loss', 0) for log in logging_outputs) / sample_size / math.log(2) if ntokens > 0 else 0.,
             'ntokens': ntokens,
             'nsentences': nsentences,

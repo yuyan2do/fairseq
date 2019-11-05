@@ -11,7 +11,7 @@
         "peak_lr": 0.0001,
         "total_updates": 3565,
         "warmup_updates": 2857,
-        "tokens_per_sample": 512,
+        "tokens_per_sample": 128,
         "max_sentences": 16,
         "update_freq": 64,
         "num_workers": 8,
@@ -35,6 +35,14 @@
         "max_sentences": 32,
         "update_freq": 4
     },
+    "dgx2_pretrain_albert_128": {
+        "max_epoch": 36,
+        "peak_lr": 0.0002,
+        "total_updates": 400000,
+        "warmup_updates": 10000,
+        "max_sentences": 32,
+        "update_freq": 4
+    },
     "dgx_pretrain": {
         "max_epoch": 36,
         "peak_lr": 0.0007,
@@ -55,11 +63,11 @@
     },
     "v100_4gpu_pretrain": {
         "max_epoch": 36,
-        "peak_lr": 0.001,
-        "total_updates": 125000,
-        "warmup_updates": 24000,
-        "max_sentences": 16,
-        "update_freq": 32
+        "peak_lr": 0.0002,
+        "total_updates": 600000,
+        "warmup_updates": 10000,
+        "max_sentences": 8,
+        "update_freq": 8
     },
     "v100_4gpu_continue_train": {
         "max_sentences": 16,

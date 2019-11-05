@@ -343,6 +343,8 @@ def base_architecture(args):
     args.activation_dropout = getattr(args, 'activation_dropout', 0.0)
     args.pooler_dropout = getattr(args, 'pooler_dropout', 0.0)
 
+    args.max_positions = 512
+
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_small')
 def albert_base_architecture(args):
