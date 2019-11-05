@@ -40,8 +40,8 @@
         "peak_lr": 0.0002,
         "total_updates": 400000,
         "warmup_updates": 10000,
-        "max_sentences": 32,
-        "update_freq": 4
+        "max_sentences": 64,
+        "update_freq": 2
     },
     "dgx_pretrain": {
         "max_epoch": 36,
@@ -66,8 +66,8 @@
         "peak_lr": 0.0002,
         "total_updates": 600000,
         "warmup_updates": 10000,
-        "max_sentences": 8,
-        "update_freq": 8
+        "max_sentences": 32,
+        "update_freq": 2
     },
     "v100_4gpu_continue_train": {
         "max_sentences": 16,
