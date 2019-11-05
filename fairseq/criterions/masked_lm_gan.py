@@ -93,12 +93,10 @@ class MaskedLmGanLoss(FairseqCriterion):
                 ignore_index=2,
             )
 
-            if self.loss_lambda < 1 and (loss_dicriminant / sample['ntokens']) < 0.2:
-                self.loss_lambda = 1
-            elif self.loss_lambda < 5 and (loss_dicriminant / sample['ntokens']) < 0.1:
-                self.loss_lambda = 5
-            elif self.loss_lambda < 50 and (loss_dicriminant / sample['ntokens']) < 0.02:
-                self.loss_lambda = 50
+            while self.loss_lambda < 50 and (self.loss_lambda * loss_dicriminant / sample['ntokens']) < 0.1:
+                self.loss_lambda *= 2
+                if self.loss_lambda > 50:
+                    self.loss_lambda = 50
 
             loss += self.loss_lambda * loss_dicriminant
         else:
@@ -119,6 +117,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             'mlm_sample_size': mlm_sample_size,
             'match_mlm_cnt': match_mlm_cnt,
             'match_dicriminant_cnt': match_dicriminant_cnt,
+            'loss_lambda': self.loss_lambda,
         }
         return loss, sample_size, logging_output
 
@@ -134,12 +133,15 @@ class MaskedLmGanLoss(FairseqCriterion):
         sample_size = sum(log.get('sample_size', 0) for log in logging_outputs)
         match_mlm_cnt = sum(log.get('match_mlm_cnt', 0) for log in logging_outputs)
         match_dicriminant_cnt = sum(log.get('match_dicriminant_cnt', 0) for log in logging_outputs)
+        loss_lambda = [log.get('loss_lambda', 0) for log in logging_outputs]
+        loss_lambda = sum(loss_lambda) / len(loss_lambda)
 
         agg_output = {
             'loss': loss / sample_size / math.log(2),
             'loss_mlm': loss_mlm / mlm_sample_size / math.log(2),
             'loss_dicriminant': loss_dicriminant / ntokens / math.log(2) if ntokens > 0 else 0.,
             'nll_loss': sum(log.get('nll_loss', 0) for log in logging_outputs) / sample_size / math.log(2) if ntokens > 0 else 0.,
+            'loss_lambda': loss_lambda,
             'ntokens': ntokens,
             'nsentences': nsentences,
             'sample_size': sample_size,
