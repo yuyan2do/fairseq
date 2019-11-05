@@ -93,7 +93,11 @@ class MaskedLmGanLoss(FairseqCriterion):
                 ignore_index=2,
             )
 
-            if (loss_dicriminant / sample['ntokens']) < 0.2:
+            if self.loss_lambda < 1 and (loss_dicriminant / sample['ntokens']) < 0.2:
+                self.loss_lambda = 1
+            elif self.loss_lambda < 5 and (loss_dicriminant / sample['ntokens']) < 0.1:
+                self.loss_lambda = 5
+            elif self.loss_lambda < 50 and (loss_dicriminant / sample['ntokens']) < 0.02:
                 self.loss_lambda = 50
 
             loss += self.loss_lambda * loss_dicriminant
