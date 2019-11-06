@@ -72,7 +72,6 @@ class MaskedLmGanLoss(FairseqCriterion):
             ignore_index=self.padding_idx,
         )
 
-
         loss = loss_mlm
         # if float(match_mlm_cnt) / mlm_sample_size > 0.5:
         #    self.enable_dicriminant = True
@@ -93,18 +92,13 @@ class MaskedLmGanLoss(FairseqCriterion):
                 ignore_index=2,
             )
 
-            dicriminat_loss_low_cnt = 0
-            if self.loss_lambda < 50 and (self.loss_lambda * (loss_dicriminant / sample['ntokens'] / math.log(2))) < 0.1:
-                dicriminat_loss_low_cnt += 1
-
-                if dicriminat_loss_low_cnt > 100:
-                    self.loss_lambda *= 1.5
-                    dicriminat_loss_low_cnt = 0
-
-                if self.loss_lambda > 50:
-                    self.loss_lambda = 50
+            ratio = self.loss_lambda * loss_dicriminant / loss_mlm
+            if ratio < 0.06:
+                self.loss_lambda *= 1.5
+            elif ratio > 0.12:
+                self.loss_lambda /= 1.5
             else:
-                dicriminat_loss_low_cnt = 0
+                pass
 
             loss += self.loss_lambda * loss_dicriminant
         else:
