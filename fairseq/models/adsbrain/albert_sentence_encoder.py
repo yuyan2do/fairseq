@@ -71,6 +71,7 @@ class AlbertSentenceEncoder(nn.Module):
         padding_idx: int,
         vocab_size: int,
         num_encoder_layers: int = 6,
+        num_hidden_groups: int = 6,
         word_dim: int = 128,
         embedding_dim: int = 768,
         ffn_embedding_dim: int = 3072,
@@ -107,6 +108,7 @@ class AlbertSentenceEncoder(nn.Module):
         self.apply_bert_init = apply_bert_init
         self.learned_pos_embedding = learned_pos_embedding
         self.num_encoder_layers = num_encoder_layers
+        self.num_hidden_groups = num_hidden_groups
 
         self.embed_tokens = nn.Embedding(
             self.vocab_size, self.word_dim, self.padding_idx
@@ -135,7 +137,8 @@ class AlbertSentenceEncoder(nn.Module):
         else:
             self.fc = None
 
-        self.layer = AlbertSentenceEncoderLayer(
+        self.layers = nn.ModuleList([
+                      AlbertSentenceEncoderLayer(
                           embedding_dim=self.embedding_dim,
                           ffn_embedding_dim=ffn_embedding_dim,
                           num_attention_heads=num_attention_heads,
@@ -147,23 +150,23 @@ class AlbertSentenceEncoder(nn.Module):
                           add_bias_kv=add_bias_kv,
                           add_zero_attn=add_zero_attn,
                           export=export,
-                          num_encoder_layers = self.num_encoder_layers
                       )
+                      for _ in range(num_hidden_groups)])
 
         if encoder_normalize_before:
             self.emb_layer_norm = LayerNorm(self.word_dim, export=export)
         else:
             self.emb_layer_norm = None
 
-        self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
+        # self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
 
         # Apply initialization of model params after building the model
         if self.apply_bert_init:
             self.apply(init_bert_params)
             # follow Generating Long Sequences with Sparse Transformers
             # to keep the ratio of embedding scale to residual block scale invariant across layer
-            self.layer.self_attn.out_proj.weight.data.normal_(mean=0.0, std=0.02 / torch.sqrt(torch.tensor(2 * self.num_encoder_layers, dtype=torch.float)))
-            self.layer.fc2.weight.data.normal_(mean=0.0, std=0.02 / torch.sqrt(torch.tensor(2 * self.num_encoder_layers, dtype=torch.float)))
+            # self.layer.self_attn.out_proj.weight.data.normal_(mean=0.0, std=0.02 / torch.sqrt(torch.tensor(2 * self.num_encoder_layers, dtype=torch.float)))
+            # self.layer.fc2.weight.data.normal_(mean=0.0, std=0.02 / torch.sqrt(torch.tensor(2 * self.num_encoder_layers, dtype=torch.float)))
 
         def freeze_module_params(m):
             if m is not None:
@@ -185,11 +188,7 @@ class AlbertSentenceEncoder(nn.Module):
         segment_labels: torch.Tensor = None,
         last_state_only: bool = False,
         positions: Optional[torch.Tensor] = None,
-        execute_times: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-
-        if execute_times is None:
-            execute_times = self.num_encoder_layers
 
         # compute padding mask. This is needed for multi-head attention
         padding_mask = tokens.eq(self.padding_idx)
@@ -226,12 +225,14 @@ class AlbertSentenceEncoder(nn.Module):
         if not last_state_only:
             inner_states.append(x)
 
-        for i in range(execute_times):
-            x, _ = self.layer(x, self_attn_padding_mask=padding_mask, layer=i)
+
+        for layer_idx in range(self.num_encoder_layers):
+            group_idx = int(layer_idx * self.num_hidden_groups / self.num_encoder_layers)
+            x, _ = self.layers[group_idx](x, self_attn_padding_mask=padding_mask)
             if not last_state_only:
                 inner_states.append(x)
 
-        x = self.final_layer_norm(x)
+        # x = self.final_layer_norm(x)
         # T x B x C -> B x T x C
         x = x.transpose(0, 1)
 
@@ -261,7 +262,6 @@ class AlbertSentenceEncoderLayer(nn.Module):
         add_bias_kv: bool = False,
         add_zero_attn: bool = False,
         export: bool = False,
-        num_encoder_layers: int = 6,
     ) -> None:
 
         super().__init__()
@@ -283,28 +283,25 @@ class AlbertSentenceEncoderLayer(nn.Module):
         )
 
         # layer norm associated with the self attention layer
-        self.self_attn_layer_norm_list = nn.ModuleList([ LayerNorm(self.embedding_dim, export=export) for _ in range(num_encoder_layers - 1)])
+        self.self_attn_layer_norm = LayerNorm(self.embedding_dim, export=export)
         self.fc1 = nn.Linear(self.embedding_dim, ffn_embedding_dim)
         self.fc2 = nn.Linear(ffn_embedding_dim, self.embedding_dim)
 
         # layer norm associated with the position wise feed-forward NN
-        self.final_layer_norm_list = nn.ModuleList([ LayerNorm(self.embedding_dim, export=export) for _ in range(num_encoder_layers)])
+        self.final_layer_norm = LayerNorm(self.embedding_dim, export=export)
 
     def forward(
         self,
         x: torch.Tensor,
         self_attn_mask: torch.Tensor = None,
         self_attn_padding_mask: torch.Tensor = None,
-        layer: torch.Tensor = None,
     ):
         """
         LayerNorm is applied either before or after the self-attention/ffn
         modules similar to the original Transformer imlementation.
         """
-        residual = x
 
-        if layer > 0:
-            x = self.self_attn_layer_norm_list[layer - 1](x)
+        residual = x
 
         x, attn = self.self_attn(
             query=x,
@@ -317,14 +314,16 @@ class AlbertSentenceEncoderLayer(nn.Module):
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         x = residual + x
+        x = self.self_attn_layer_norm(x)
 
         residual = x
 
-        x = self.final_layer_norm_list[layer](x)
         x = self.activation_fn(self.fc1(x))
         x = F.dropout(x, p=self.activation_dropout, training=self.training)
         x = self.fc2(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
 
         x = residual + x
+        x = self.final_layer_norm(x)
+
         return x, attn

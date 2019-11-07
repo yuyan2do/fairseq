@@ -3,7 +3,7 @@
 cd ~/code/fairseq
 #pip install --user fairseq
 pip install --user --editable .
-pip install --user tensorboardX
+#pip install --user tensorboardX
 
 export PATH="$HOME/.local/bin:$PATH"
 
@@ -54,4 +54,5 @@ fairseq-train --fp16 $DATA_DIR $restore_file_command \
     --max-update $TOTAL_UPDATES --log-format tqdm \
     --bpe gpt2 --gpt2-encoder-json ~/data/bert_pretrain/gpt2_bpe/encoder.json \
     --gpt2-vocab-bpe ~/data/bert_pretrain/gpt2_bpe/vocab.bpe \
+    --keep-last-epochs 5 \
     $extra_command

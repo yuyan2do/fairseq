@@ -22,7 +22,7 @@ class MaskedLmGanLoss(FairseqCriterion):
     def __init__(self, args, task):
         super().__init__(args, task)
         self.loss_lambda = 0.1
-        self.enable_dicriminant = True
+        self.enable_dicriminant = False
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -79,7 +79,10 @@ class MaskedLmGanLoss(FairseqCriterion):
         if self.enable_dicriminant:
             logits_dicriminant = model(gan_token)[0]
 
-            match_dicriminant_cnt = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1)).sum().item()
+            match_dicriminant = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1))
+            match_dicriminant_cnt = match_dicriminant.sum().item()
+            changed_token_num = (targets_dicriminant == 0).sum().item()
+            true_predict_changed_token_num = (match_dicriminant[(targets_dicriminant == 0)]).sum().item()
 
             loss_dicriminant = F.nll_loss(
                 F.log_softmax(
@@ -92,17 +95,21 @@ class MaskedLmGanLoss(FairseqCriterion):
                 ignore_index=2,
             )
 
-            ratio = self.loss_lambda * loss_dicriminant / loss_mlm
-            if ratio < 0.06:
+            dicriminat_error_ratio = self.loss_lambda * loss_dicriminant / loss_mlm
+            '''
+            if ratio < 0.02:
                 self.loss_lambda *= 1.5
-            elif ratio > 0.12:
+            elif ratio > 0.04:
                 self.loss_lambda /= 1.5
             else:
                 pass
-
+            '''
             loss += self.loss_lambda * loss_dicriminant
         else:
             match_dicriminant_cnt = 0
+            dicriminat_error_ratio = 0
+            changed_token_num = 0
+            true_predict_changed_token_num = 0
             loss_dicriminant = torch.tensor(0)
 
 
@@ -120,6 +127,9 @@ class MaskedLmGanLoss(FairseqCriterion):
             'match_mlm_cnt': match_mlm_cnt,
             'match_dicriminant_cnt': match_dicriminant_cnt,
             'loss_lambda': self.loss_lambda,
+            'dicriminat_error_ratio': dicriminat_error_ratio,
+            'changed_token_num': changed_token_num,
+            'true_predict_changed_token_num': true_predict_changed_token_num,
         }
         return loss, sample_size, logging_output
 
@@ -137,6 +147,10 @@ class MaskedLmGanLoss(FairseqCriterion):
         match_dicriminant_cnt = sum(log.get('match_dicriminant_cnt', 0) for log in logging_outputs)
         loss_lambda = [log.get('loss_lambda', 0) for log in logging_outputs]
         loss_lambda = sum(loss_lambda) / len(loss_lambda)
+        dicriminat_error_ratio = [log.get('dicriminat_error_ratio', 0) for log in logging_outputs]
+        dicriminat_error_ratio = sum(dicriminat_error_ratio) / len(dicriminat_error_ratio)
+        changed_token_num = sum(log.get('changed_token_num', 0) for log in logging_outputs)
+        true_predict_changed_token_num = sum(log.get('true_predict_changed_token_num', 0) for log in logging_outputs)
 
         agg_output = {
             'loss': loss / sample_size / math.log(2),
@@ -144,6 +158,9 @@ class MaskedLmGanLoss(FairseqCriterion):
             'loss_dicriminant': loss_dicriminant / ntokens / math.log(2) if ntokens > 0 else 0.,
             'nll_loss': sum(log.get('nll_loss', 0) for log in logging_outputs) / sample_size / math.log(2) if ntokens > 0 else 0.,
             'loss_lambda': loss_lambda,
+            'dicriminat_error_ratio': dicriminat_error_ratio,
+            'changed_token_num': changed_token_num,
+            'true_predict_changed_token_num': true_predict_changed_token_num,
             'ntokens': ntokens,
             'nsentences': nsentences,
             'sample_size': sample_size,

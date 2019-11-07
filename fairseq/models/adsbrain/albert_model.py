@@ -52,6 +52,8 @@ class AlbertModel(FairseqLanguageModel):
         """Add model-specific arguments to the parser."""
         parser.add_argument('--encoder-layers', type=int, metavar='L',
                             help='num encoder layers')
+        parser.add_argument('--num-hidden-groups', type=int, metavar='L',
+                            help='num group of paramter for encoder layers')
         parser.add_argument('--word-embed-dim', type=int, metavar='H',
                             help='word embedding dimension')
         parser.add_argument('--encoder-embed-dim', type=int, metavar='H',
@@ -253,6 +255,7 @@ class AlbertEncoder(FairseqDecoder):
             padding_idx=dictionary.pad(),
             vocab_size=len(dictionary),
             num_encoder_layers=args.encoder_layers,
+            num_hidden_groups=args.num_hidden_groups,
             word_dim=args.word_embed_dim,
             embedding_dim=args.encoder_embed_dim,
             ffn_embedding_dim=args.encoder_ffn_embed_dim,
@@ -303,14 +306,10 @@ class AlbertEncoder(FairseqDecoder):
         return x, extra
 
     def extract_features(self, src_tokens, return_all_hiddens=False, masked_tokens=None, **unused):
-        execute_times = None
-        if masked_tokens is not None:
-            execute_times = 6
 
         inner_states, _ = self.sentence_encoder(
             src_tokens,
             last_state_only=not return_all_hiddens,
-            execute_times=execute_times,
         )
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None}
@@ -329,6 +328,7 @@ class AlbertEncoder(FairseqDecoder):
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert')
 def base_architecture(args):
     args.encoder_layers = getattr(args, 'encoder_layers', 12)
+    args.num_hidden_groups = getattr(args, 'num_hidden_groups', 1)
     args.word_embed_dim = getattr(args, 'word_embed_dim', 128)
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 256)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 1024)
@@ -351,8 +351,21 @@ def albert_base_architecture(args):
     args.encoder_layers = getattr(args, 'encoder_layers', 1)
     base_architecture(args)
 
+@register_model_architecture('adsbrain_albert', 'adsbrain_albert_exp')
+def albert_base_architecture(args):
+    args.num_hidden_groups = getattr(args, 'num_hidden_groups', 1)
+    args.word_embed_dim = getattr(args, 'word_embed_dim', 128)
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
+    args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
+    args.dim_multiplier = getattr(args, 'dim_multiplier', 2)
+    base_architecture(args)
+
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_base')
 def albert_base_architecture(args):
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 768)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 3072)
+    args.dim_multiplier = getattr(args, 'dim_multiplier', 1)
     base_architecture(args)
 
 
@@ -366,8 +379,9 @@ def albert_large_architecture(args):
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_xxlarge')
 def albert_large_architecture(args):
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 64)
-    args.dim_multiplier = getattr(args, 'dim_multiplier', 16)
+    args.dim_multiplier = getattr(args, 'dim_multiplier', 8)
     base_architecture(args)
 
 
