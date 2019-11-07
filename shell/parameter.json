@@ -32,16 +32,16 @@
         "peak_lr": 0.0007,
         "total_updates": 125000,
         "warmup_updates": 24000,
-        "max_sentences": 128,
-        "update_freq": 1
+        "max_sentences": 32,
+        "update_freq": 4
     },
     "dgx2_pretrain_albert_128": {
         "max_epoch": 36,
         "peak_lr": 0.0002,
         "total_updates": 400000,
         "warmup_updates": 10000,
-        "max_sentences": 64,
-        "update_freq": 2
+        "max_sentences": 128,
+        "update_freq": 1
     },
     "dgx_pretrain": {
         "max_epoch": 36,
