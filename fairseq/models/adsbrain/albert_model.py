@@ -348,13 +348,14 @@ def base_architecture(args):
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_small')
 def albert_base_architecture(args):
-    args.encoder_layers = getattr(args, 'encoder_layers', 1)
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 256)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 1024)
+    args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 8)
+    args.dim_multiplier = getattr(args, 'dim_multiplier', 2)
     base_architecture(args)
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_exp')
 def albert_base_architecture(args):
-    args.num_hidden_groups = getattr(args, 'num_hidden_groups', 1)
-    args.word_embed_dim = getattr(args, 'word_embed_dim', 128)
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
