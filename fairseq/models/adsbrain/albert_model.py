@@ -314,11 +314,11 @@ class AlbertEncoder(FairseqDecoder):
         features = inner_states[-1]
         return features, {'inner_states': inner_states if return_all_hiddens else None}
 
-    def output_layer(self, features, masked_tokens=None, **unused):
-        if masked_tokens is not None:
-            return self.lm_head(features, masked_tokens)
-        else:
+    def output_layer(self, features, masked_tokens=None, discriminat=False, **unused):
+        if discriminat:
             return self.discriminant_head(features)
+
+        return self.lm_head(features, masked_tokens)
 
     def max_positions(self):
         """Maximum output length supported by the encoder."""

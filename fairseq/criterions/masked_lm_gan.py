@@ -23,6 +23,8 @@ class MaskedLmGanLoss(FairseqCriterion):
         super().__init__(args, task)
         self.loss_lambda = 0.1
         self.enable_dicriminant = False
+        self.two_stage = False
+        self.two_stage_prob = 0.5
 
     def forward(self, model, sample, reduce=True):
         """Compute the loss for the given sample.
@@ -40,7 +42,18 @@ class MaskedLmGanLoss(FairseqCriterion):
         if sample_size == 0:
             masked_tokens = None
 
-        logits_mlm = model(**sample['net_input'], masked_tokens=masked_tokens)[0]
+
+        if torch.rand(1)[0] < self.two_stage_prob:
+            self.two_stage = True
+        else:
+            self.two_stage = False
+
+        if self.two_stage:
+            with utils.eval(model):
+                with torch.no_grad():
+                    logits_mlm = model(**sample['net_input'], masked_tokens=masked_tokens)[0]
+        else:
+            logits_mlm = model(**sample['net_input'], masked_tokens=masked_tokens)[0]
 
         targets_mlm = model.get_targets(sample, [logits_mlm])
         targets_dicriminant = torch.ones_like(masked_tokens, dtype=torch.long, device=masked_tokens.get_device())
@@ -57,8 +70,18 @@ class MaskedLmGanLoss(FairseqCriterion):
             gan_token = sample['net_input']['src_tokens'].detach().clone()
             gan_token[masked_tokens] = predict_token
             # print('after', gan_token[masked_tokens])
+            changed_token_num = (targets_dicriminant == 0).sum().item()
+
+            if self.two_stage:
+                logits_mlm = model(gan_token, masked_tokens=masked_tokens)[0]
+                second_predict_token = torch.argmax(logits_mlm, dim=-1)
+                second_match_mlm = (targets_mlm == second_predict_token)
+                second_match_mlm_gain_cnt = (second_match_mlm.sum().item() - match_mlm_cnt) / self.two_stage_prob
+            else:
+                second_match_mlm_gain_cnt = 0
         else:
             match_mlm_cnt = 0
+            second_match_mlm_gain_cnt = 0
 
         mlm_sample_size = sample_size
         loss_mlm = F.nll_loss(
@@ -81,7 +104,6 @@ class MaskedLmGanLoss(FairseqCriterion):
 
             match_dicriminant = (targets_dicriminant == torch.argmax(logits_dicriminant, dim=-1))
             match_dicriminant_cnt = match_dicriminant.sum().item()
-            changed_token_num = (targets_dicriminant == 0).sum().item()
             true_predict_changed_token_num = (match_dicriminant[(targets_dicriminant == 0)]).sum().item()
 
             loss_dicriminant = F.nll_loss(
@@ -108,7 +130,6 @@ class MaskedLmGanLoss(FairseqCriterion):
         else:
             match_dicriminant_cnt = 0
             dicriminat_error_ratio = 0
-            changed_token_num = 0
             true_predict_changed_token_num = 0
             loss_dicriminant = torch.tensor(0)
 
@@ -125,6 +146,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             'sample_size': sample_size,
             'mlm_sample_size': mlm_sample_size,
             'match_mlm_cnt': match_mlm_cnt,
+            'second_match_mlm_gain_cnt': second_match_mlm_gain_cnt,
             'match_dicriminant_cnt': match_dicriminant_cnt,
             'loss_lambda': self.loss_lambda,
             'dicriminat_error_ratio': dicriminat_error_ratio,
@@ -144,6 +166,7 @@ class MaskedLmGanLoss(FairseqCriterion):
         mlm_sample_size = sum(log.get('mlm_sample_size', 0) for log in logging_outputs)
         sample_size = sum(log.get('sample_size', 0) for log in logging_outputs)
         match_mlm_cnt = sum(log.get('match_mlm_cnt', 0) for log in logging_outputs)
+        second_match_mlm_gain_cnt = sum(log.get('second_match_mlm_gain_cnt', 0) for log in logging_outputs)
         match_dicriminant_cnt = sum(log.get('match_dicriminant_cnt', 0) for log in logging_outputs)
         loss_lambda = [log.get('loss_lambda', 0) for log in logging_outputs]
         loss_lambda = sum(loss_lambda) / len(loss_lambda)
@@ -165,6 +188,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             'nsentences': nsentences,
             'sample_size': sample_size,
             'accuracy_mlm': float(match_mlm_cnt) / sample_size if sample_size != 0 else 0,
+            'accuracy_second_mlm_gain': float(second_match_mlm_gain_cnt) / sample_size if sample_size != 0 else 0,
             'accuracy_dicriminant': float(match_dicriminant_cnt) / ntokens if ntokens != 0 else 0,
         }
         return agg_output
