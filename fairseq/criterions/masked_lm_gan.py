@@ -43,7 +43,7 @@ class MaskedLmGanLoss(FairseqCriterion):
             masked_tokens = None
 
 
-        if torch.rand(1)[0] < self.two_stage_prob:
+        if False && torch.rand(1)[0] < self.two_stage_prob:
             self.two_stage = True
         else:
             self.two_stage = False

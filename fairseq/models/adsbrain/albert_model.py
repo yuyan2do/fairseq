@@ -355,12 +355,17 @@ def albert_base_architecture(args):
     base_architecture(args)
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_exp')
-def albert_base_architecture(args):
+def albert_exp_architecture(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
     args.dim_multiplier = getattr(args, 'dim_multiplier', 2)
     base_architecture(args)
+
+@register_model_architecture('adsbrain_albert', 'adsbrain_albert_exp_6group')
+def albert_base_architecture(args):
+    args.num_hidden_groups = getattr(args, 'num_hidden_groups', 6)
+    albert_exp_architecture(args) 
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_base')
 def albert_base_architecture(args):
