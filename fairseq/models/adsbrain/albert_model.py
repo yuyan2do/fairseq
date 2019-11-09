@@ -199,12 +199,11 @@ class AlbertLMHead(nn.Module):
     def __init__(self, embed_dim, word_dim, output_dim, activation_fn, weight=None, fc_weight=None):
         super().__init__()
         # self.dense = nn.Linear(embed_dim, word_dim)
+        self.share_fc_weight = None
         if fc_weight is None:
-            fc_weight = nn.Linear(word_dim, embed_dim, bias=False).weight
-        else:
-            fc_weight = fc_weight + nn.Linear(word_dim, embed_dim, bias=False).weight
-        self.fc_weight = fc_weight
-        self.fc_bias = nn.Parameter(torch.zeros(word_dim))
+            self.share_fc_weight = fc_weight
+        self.fc_weight = nn.Linear(word_dim, embed_dim, bias=False).weight
+        #self.fc_bias = nn.Parameter(torch.zeros(word_dim))
 
         self.activation_fn = utils.get_activation_fn(activation_fn)
         self.layer_norm = LayerNorm(word_dim)
@@ -220,7 +219,10 @@ class AlbertLMHead(nn.Module):
         if masked_tokens is not None:
             features = features[masked_tokens, :]
 
-        x = features.matmul(self.fc_weight) + self.fc_bias
+        if self.share_fc_weight is None:
+            x = features.matmul(self.fc_weight)
+        else:
+            x = features.matmul(self.share_fc_weight + self.fc_weight)
         # x = F.linear(features, self.fc_weight) + self.fc_bias
         #x = self.dense(features)
         x = self.activation_fn(x)
