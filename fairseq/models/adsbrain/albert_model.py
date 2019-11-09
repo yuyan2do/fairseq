@@ -202,7 +202,7 @@ class AlbertLMHead(nn.Module):
         if fc_weight is None:
             fc_weight = nn.Linear(word_dim, embed_dim, bias=False).weight
         else:
-            fc_weight += nn.Linear(word_dim, embed_dim, bias=False).weight
+            fc_weight = fc_weight + nn.Linear(word_dim, embed_dim, bias=False).weight
         self.fc_weight = fc_weight
         self.fc_bias = nn.Parameter(torch.zeros(word_dim))
 
