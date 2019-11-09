@@ -196,9 +196,14 @@ class AlbertModel(FairseqLanguageModel):
 class AlbertLMHead(nn.Module):
     """Head for masked language modeling."""
 
-    def __init__(self, embed_dim, word_dim, output_dim, activation_fn, weight=None):
+    def __init__(self, embed_dim, word_dim, output_dim, activation_fn, weight=None, fc_weight=None):
         super().__init__()
-        self.dense = nn.Linear(embed_dim, word_dim)
+        # self.dense = nn.Linear(embed_dim, word_dim)
+        if fc_weight is None:
+            fc_weight = nn.Linear(embed_dim, word_dim, bias=False).weight.t()
+        self.fc_weight = fc_weight
+        self.fc_bias = nn.Parameter(torch.zeros(word_dim))
+
         self.activation_fn = utils.get_activation_fn(activation_fn)
         self.layer_norm = LayerNorm(word_dim)
 
@@ -213,7 +218,9 @@ class AlbertLMHead(nn.Module):
         if masked_tokens is not None:
             features = features[masked_tokens, :]
 
-        x = self.dense(features)
+        x = features.matmul(self.fc_weight) + self.fc_bias
+        # x = F.linear(features, self.fc_weight) + self.fc_bias
+        #x = self.dense(features)
         x = self.activation_fn(x)
         x = self.layer_norm(x)
         # project back to size of vocabulary with bias
@@ -276,13 +283,16 @@ class AlbertEncoder(FairseqDecoder):
             output_dim=len(dictionary),
             activation_fn=args.activation_fn,
             weight=self.sentence_encoder.embed_tokens.weight,
+            fc_weight=self.sentence_encoder.fc.weight,
         )
+        '''
         self.discriminant_head = AlbertLMHead(
             embed_dim=args.encoder_embed_dim,
             word_dim=args.word_embed_dim,
             output_dim=2,
             activation_fn=args.activation_fn,
         )
+        '''
 
     def forward(self, src_tokens, features_only=False, return_all_hiddens=False, masked_tokens=None, **unused):
         """
@@ -316,7 +326,8 @@ class AlbertEncoder(FairseqDecoder):
 
     def output_layer(self, features, masked_tokens=None, discriminat=False, **unused):
         if discriminat:
-            return self.discriminant_head(features)
+            # return self.discriminant_head(features)
+            return self.lm_head(features, masked_tokens)
 
         return self.lm_head(features, masked_tokens)
 
@@ -385,9 +396,11 @@ def albert_large_architecture(args):
 
 @register_model_architecture('adsbrain_albert', 'adsbrain_albert_xxlarge')
 def albert_large_architecture(args):
-    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
+    args.num_hidden_groups = getattr(args, 'num_hidden_groups', 6)
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 1024)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 4096)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 64)
-    args.dim_multiplier = getattr(args, 'dim_multiplier', 8)
+    args.dim_multiplier = getattr(args, 'dim_multiplier', 4)
     base_architecture(args)
 
 

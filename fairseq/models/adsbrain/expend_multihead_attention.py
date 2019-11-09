@@ -268,7 +268,12 @@ class ExpendMultiheadAttention(nn.Module):
         if before_softmax:
             return attn_weights, v
 
-        attn_weights_float = utils.softmax(attn_weights, dim=-1, onnx_trace=self.onnx_trace)
+        negtive_softmax = False
+        if negtive_softmax:
+            attn_weights_float = attn_weights.sign() * utils.softmax(attn_weights.abs(), dim=-1, onnx_trace=self.onnx_trace)
+        else:
+            attn_weights_float = utils.softmax(attn_weights, dim=-1, onnx_trace=self.onnx_trace)
+
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = F.dropout(attn_weights_float.type_as(attn_weights), p=self.dropout, training=self.training)
 
