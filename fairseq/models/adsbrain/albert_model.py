@@ -196,15 +196,9 @@ class AlbertModel(FairseqLanguageModel):
 class AlbertLMHead(nn.Module):
     """Head for masked language modeling."""
 
-    def __init__(self, embed_dim, word_dim, output_dim, activation_fn, weight=None, fc_weight=None):
+    def __init__(self, embed_dim, word_dim, output_dim, activation_fn, weight=None):
         super().__init__()
-        # self.dense = nn.Linear(embed_dim, word_dim)
-        self.share_fc_weight = None
-        if fc_weight is None:
-            self.share_fc_weight = fc_weight
-        self.fc_weight = nn.Linear(word_dim, embed_dim, bias=False).weight
-        #self.fc_bias = nn.Parameter(torch.zeros(word_dim))
-
+        self.dense = nn.Linear(embed_dim, word_dim)
         self.activation_fn = utils.get_activation_fn(activation_fn)
         self.layer_norm = LayerNorm(word_dim)
 
@@ -219,12 +213,7 @@ class AlbertLMHead(nn.Module):
         if masked_tokens is not None:
             features = features[masked_tokens, :]
 
-        if self.share_fc_weight is None:
-            x = features.matmul(self.fc_weight)
-        else:
-            x = features.matmul(self.share_fc_weight + self.fc_weight)
-        # x = F.linear(features, self.fc_weight) + self.fc_bias
-        #x = self.dense(features)
+        x = self.dense(features)
         x = self.activation_fn(x)
         x = self.layer_norm(x)
         # project back to size of vocabulary with bias
@@ -287,7 +276,6 @@ class AlbertEncoder(FairseqDecoder):
             output_dim=len(dictionary),
             activation_fn=args.activation_fn,
             weight=self.sentence_encoder.embed_tokens.weight,
-            fc_weight=self.sentence_encoder.fc.weight,
         )
         '''
         self.discriminant_head = AlbertLMHead(
