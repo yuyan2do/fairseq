@@ -307,12 +307,20 @@ class MultiheadAttention(nn.Module):
 
     def reorder_incremental_state(self, incremental_state, new_order):
         """Reorder buffered internal state (for incremental generation)."""
+        if self.encoder_decoder_attention:
+            return
+
+        if self.encoder_decoder_attention == False:
+            torch.cuda.nvtx.range_push("reoder_self_attn")
+        else:
+            torch.cuda.nvtx.range_push("reoder_cross_attn")
         input_buffer = self._get_input_buffer(incremental_state)
         if input_buffer is not None:
             for k in input_buffer.keys():
                 if input_buffer[k] is not None:
                     input_buffer[k] = input_buffer[k].index_select(0, new_order)
             self._set_input_buffer(incremental_state, input_buffer)
+        torch.cuda.nvtx.range_pop()
 
     def _get_input_buffer(self, incremental_state):
         return utils.get_incremental_state(

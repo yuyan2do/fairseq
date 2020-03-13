@@ -148,8 +148,10 @@ class SequenceGenerator(object):
                 model.max_decoder_positions() - 1,
             )
 
+        torch.cuda.nvtx.range_push("forward encoder")
         # compute the encoder output for each beam
         encoder_outs = model.forward_encoder(encoder_input)
+        torch.cuda.nvtx.range_pop()
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
         new_order = new_order.to(src_tokens.device).long()
         encoder_outs = model.reorder_encoder_out(encoder_outs, new_order)
@@ -282,6 +284,7 @@ class SequenceGenerator(object):
         reorder_state = None
         batch_idxs = None
         for step in range(max_len + 1):  # one extra step for EOS marker
+            torch.cuda.nvtx.range_push("reoder_state")
             # reorder decoder internal states based on the prev choice of beams
             if reorder_state is not None:
                 if batch_idxs is not None:
@@ -290,13 +293,19 @@ class SequenceGenerator(object):
                     reorder_state.view(-1, beam_size).add_(corr.unsqueeze(-1) * beam_size)
                 model.reorder_incremental_state(reorder_state)
                 encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state)
+            torch.cuda.nvtx.range_pop()
 
+            torch.cuda.nvtx.range_push("forward decoder")
             lprobs, avg_attn_scores = model.forward_decoder(
                 tokens[:, :step + 1], encoder_outs, temperature=self.temperature,
             )
+            torch.cuda.nvtx.range_pop()
 
+            torch.cuda.nvtx.range_push("post_process")
+            torch.cuda.nvtx.range_push("block_pad_unk")
             lprobs[:, self.pad] = -math.inf  # never select pad
             lprobs[:, self.unk] -= self.unk_penalty  # apply unk penalty
+            torch.cuda.nvtx.range_pop()
 
             # handle max length constraint
             if step >= max_len:
@@ -333,16 +342,20 @@ class SequenceGenerator(object):
                     lprobs = replicate_first_beam(lprobs, eos_mask_batch_dim)
             elif step < self.min_len:
                 # minimum length constraint (does not apply if using prefix_tokens)
+                torch.cuda.nvtx.range_push("block_eos")
                 lprobs[:, self.eos] = -math.inf
+                torch.cuda.nvtx.range_pop()
 
             if self.no_repeat_ngram_size > 0:
                 # for each beam and batch sentence, generate a list of previous ngrams
                 gen_ngrams = [{} for bbsz_idx in range(bsz * beam_size)]
+                cpu_tokens = tokens.cpu()
                 for bbsz_idx in range(bsz * beam_size):
-                    gen_tokens = tokens[bbsz_idx].tolist()
+                    gen_tokens = cpu_tokens[bbsz_idx].tolist()
                     for ngram in zip(*[gen_tokens[i:] for i in range(self.no_repeat_ngram_size)]):
-                        gen_ngrams[bbsz_idx][tuple(ngram[:-1])] = \
-                                gen_ngrams[bbsz_idx].get(tuple(ngram[:-1]), []) + [ngram[-1]]
+                        if ngram[-1] != self.pad:
+                            gen_ngrams[bbsz_idx][tuple(ngram[:-1])] = \
+                                    gen_ngrams[bbsz_idx].get(tuple(ngram[:-1]), []) + [ngram[-1]]
 
             # Record attention scores
             if avg_attn_scores is not None:
@@ -361,17 +374,30 @@ class SequenceGenerator(object):
             if self.no_repeat_ngram_size > 0:
                 def calculate_banned_tokens(bbsz_idx):
                     # before decoding the next token, prevent decoding of ngrams that have already appeared
-                    ngram_index = tuple(tokens[bbsz_idx, step + 2 - self.no_repeat_ngram_size:step + 1].tolist())
-                    return gen_ngrams[bbsz_idx].get(ngram_index, [])
+                    ngram_index = tuple(cpu_tokens[bbsz_idx, step + 2 - self.no_repeat_ngram_size:step + 1].tolist())
+                    banned_tokens_per_sample = gen_ngrams[bbsz_idx].get(ngram_index, [])
+                    banned_tokens_per_sample = [(bbsz_idx, t) for t in banned_tokens_per_sample]
+                    return banned_tokens_per_sample
 
+                def pad_to_max_len(banned_tokens, max_len):
+                    if max_len > 0:
+                        for tokens in banned_tokens:
+                            curr_len = len(tokens)
+                            if curr_len < max_len:
+                                tokens.extend([self.pad] * (max_len - curr_len))
+
+                torch.cuda.nvtx.range_push("block_ngram")
+                banned_tokens = []
                 if step + 2 - self.no_repeat_ngram_size >= 0:
                     # no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
-                    banned_tokens = [calculate_banned_tokens(bbsz_idx) for bbsz_idx in range(bsz * beam_size)]
-                else:
-                    banned_tokens = [[] for bbsz_idx in range(bsz * beam_size)]
+                    for bbsz_idx in range(bsz * beam_size):
+                        banned_tokens.extend(calculate_banned_tokens(bbsz_idx))
 
-                for bbsz_idx in range(bsz * beam_size):
-                    lprobs[bbsz_idx, banned_tokens[bbsz_idx]] = -math.inf
+                if banned_tokens:
+                    banned_tokens = torch.LongTensor(banned_tokens)
+                    lprobs.index_put_(tuple(banned_tokens.t()), lprobs.new_tensor([-math.inf] * len(banned_tokens)))
+
+                torch.cuda.nvtx.range_pop()
 
             cand_scores, cand_indices, cand_beams = self.search.step(
                 step,
@@ -408,6 +434,7 @@ class SequenceGenerator(object):
 
             assert num_remaining_sent >= 0
             if num_remaining_sent == 0:
+                torch.cuda.nvtx.range_pop()
                 break
             assert step < max_len
 
@@ -512,6 +539,7 @@ class SequenceGenerator(object):
 
             # reorder incremental state in decoder
             reorder_state = active_bbsz_idx
+            torch.cuda.nvtx.range_pop()
 
         # sort by score descending
         for sent in range(len(finalized)):

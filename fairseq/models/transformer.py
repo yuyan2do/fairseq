@@ -622,7 +622,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - a dictionary with any model-specific outputs
         """
         if alignment_layer is None:
-            alignment_layer = len(self.layers) - 1
+            pass # alignment_layer = len(self.layers) - 1
 
         # embed positions
         positions = self.embed_positions(
