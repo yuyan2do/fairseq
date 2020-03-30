@@ -325,16 +325,22 @@ class SequenceGenerator(object):
                 lprobs[:, self.eos] = -math.inf
 
             torch.cuda.nvtx.range_push("block_ngram")
-            if self.no_repeat_ngram_size > 0:
+            torch.cuda.nvtx.range_push("block_prepare")
+            if self.no_repeat_ngram_size > 0 and step + 2 - self.no_repeat_ngram_size > 0:
                 # for each beam and batch sentence, generate a list of previous ngrams
                 gen_ngrams = [{} for bbsz_idx in range(bsz * beam_size)]
                 cpu_tokens = tokens.cpu()
                 for bbsz_idx in range(bsz * beam_size):
+                    target_ngram_index = tuple(cpu_tokens[bbsz_idx, step + 2 - self.no_repeat_ngram_size:step + 1].tolist())
                     gen_tokens = cpu_tokens[bbsz_idx].tolist()
-                    for ngram in zip(*[gen_tokens[i:] for i in range(self.no_repeat_ngram_size)]):
-                        if ngram[-1] != self.pad:
-                            gen_ngrams[bbsz_idx][tuple(ngram[:-1])] = \
-                                    gen_ngrams[bbsz_idx].get(tuple(ngram[:-1]), []) + [ngram[-1]]
+                    for ngram in zip(*[gen_tokens[i:step+1] for i in range(self.no_repeat_ngram_size)]):
+                        ngram_index = tuple(ngram[:-1])
+                        if ngram[-1] != self.pad and \
+                                ngram_index == target_ngram_index:
+                            gen_ngrams[bbsz_idx][ngram_index] = \
+                                    gen_ngrams[bbsz_idx].get(ngram_index, []) + [ngram[-1]]
+
+            torch.cuda.nvtx.range_pop()
 
             # Record attention scores
             if type(avg_attn_scores) is list:
@@ -361,7 +367,7 @@ class SequenceGenerator(object):
                     return banned_tokens_per_sample
 
                 banned_tokens = []
-                if step + 2 - self.no_repeat_ngram_size >= 0:
+                if step + 2 - self.no_repeat_ngram_size > 0:
                     # no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
                     for bbsz_idx in range(bsz * beam_size):
                         banned_tokens.extend(calculate_banned_tokens(bbsz_idx))

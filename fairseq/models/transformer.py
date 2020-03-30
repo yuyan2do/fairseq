@@ -499,6 +499,10 @@ class TransformerEncoder(FairseqEncoder):
         Returns:
             *encoder_out* rearranged according to *new_order*
         """
+        if encoder_out.encoder_out is not None \
+                and encoder_out.encoder_out.size(1) == new_order.size(0):
+            return encoder_out
+
         new_encoder_out: Dict[str, Tensor] = {}
 
         new_encoder_out["encoder_out"] = (
