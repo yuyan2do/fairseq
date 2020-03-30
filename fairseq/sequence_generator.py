@@ -130,7 +130,9 @@ class SequenceGenerator(object):
         assert self.min_len <= max_len, 'min_len cannot be larger than max_len, please adjust these!'
 
         # compute the encoder output for each beam
+        torch.cuda.nvtx.range_push("forward encoder")
         encoder_outs = model.forward_encoder(encoder_input)
+        torch.cuda.nvtx.range_pop()
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
         new_order = new_order.to(src_tokens.device).long()
         encoder_outs = model.reorder_encoder_out(encoder_outs, new_order)
@@ -263,6 +265,7 @@ class SequenceGenerator(object):
         reorder_state = None
         batch_idxs = None
         for step in range(max_len + 1):  # one extra step for EOS marker
+            torch.cuda.nvtx.range_push("reoder_state")
             # reorder decoder internal states based on the prev choice of beams
             if reorder_state is not None:
                 if batch_idxs is not None:
@@ -271,10 +274,14 @@ class SequenceGenerator(object):
                     reorder_state.view(-1, beam_size).add_(corr.unsqueeze(-1) * beam_size)
                 model.reorder_incremental_state(reorder_state)
                 encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state)
+            torch.cuda.nvtx.range_pop()
 
+            torch.cuda.nvtx.range_push("forward decoder")
             lprobs, avg_attn_scores = model.forward_decoder(
                 tokens[:, :step + 1], encoder_outs, temperature=self.temperature,
             )
+            torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_push("post_process")
             lprobs[lprobs != lprobs] = -math.inf
 
             lprobs[:, self.pad] = -math.inf  # never select pad
@@ -317,6 +324,7 @@ class SequenceGenerator(object):
                 # minimum length constraint (does not apply if using prefix_tokens)
                 lprobs[:, self.eos] = -math.inf
 
+            torch.cuda.nvtx.range_push("block_ngram")
             if self.no_repeat_ngram_size > 0:
                 # for each beam and batch sentence, generate a list of previous ngrams
                 gen_ngrams = [{} for bbsz_idx in range(bsz * beam_size)]
@@ -362,6 +370,7 @@ class SequenceGenerator(object):
                     banned_tokens = torch.LongTensor(banned_tokens)
                     lprobs.index_put_(tuple(banned_tokens.t()), lprobs.new_tensor([-math.inf] * len(banned_tokens)))
 
+            torch.cuda.nvtx.range_pop()
             cand_scores, cand_indices, cand_beams = self.search.step(
                 step,
                 lprobs.view(bsz, -1, self.vocab_size),
@@ -397,6 +406,7 @@ class SequenceGenerator(object):
 
             assert num_remaining_sent >= 0
             if num_remaining_sent == 0:
+                torch.cuda.nvtx.range_pop()
                 break
             assert step < max_len
 
@@ -501,6 +511,7 @@ class SequenceGenerator(object):
 
             # reorder incremental state in decoder
             reorder_state = active_bbsz_idx
+            torch.cuda.nvtx.range_pop()
 
         # sort by score descending
         for sent in range(len(finalized)):
