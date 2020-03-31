@@ -346,11 +346,15 @@ class MultiheadAttention(nn.Module):
             attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len)
             if bsz != kv_bsz:
                 assert bsz % kv_bsz == 0
-                beam_size = bsz // kv_bsz
-                key_padding_mask = key_padding_mask.repeat(beam_size, 1).reshape(beam_size, kv_bsz, -1).transpose(1, 0).reshape(bsz, -1)
-            attn_weights = attn_weights.masked_fill(
-                key_padding_mask.unsqueeze(1).unsqueeze(2).to(torch.bool), float("-inf")
-            )
+                # key_padding_mask = key_padding_mask.repeat(beam_size, 1).reshape(beam_size, kv_bsz, -1).transpose(1, 0).reshape(bsz, -1)
+                attn_weights = attn_weights.view(kv_bsz, -1, self.num_heads, tgt_len, src_len)
+                attn_weights = attn_weights.masked_fill(
+                    key_padding_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3).to(torch.bool), float("-inf")
+                )
+            else:
+                attn_weights = attn_weights.masked_fill(
+                    key_padding_mask.unsqueeze(1).unsqueeze(2).to(torch.bool), float("-inf")
+                )
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
         if before_softmax:
