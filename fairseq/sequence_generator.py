@@ -268,7 +268,7 @@ class SequenceGenerator(object):
         reorder_state = None
         batch_idxs = None
         for step in range(max_len + 1):  # one extra step for EOS marker
-            print('step', step)
+            # print('step', step)
             torch.cuda.nvtx.range_push("reoder_state")
             # reorder decoder internal states based on the prev choice of beams
             if reorder_state is not None:
