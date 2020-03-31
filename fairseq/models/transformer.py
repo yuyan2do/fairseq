@@ -499,9 +499,12 @@ class TransformerEncoder(FairseqEncoder):
         Returns:
             *encoder_out* rearranged according to *new_order*
         """
+        beam_size = 4
         if encoder_out.encoder_out is not None \
-                and encoder_out.encoder_out.size(1) == new_order.size(0):
+                and encoder_out.encoder_out.size(1) * beam_size == new_order.size(0):
             return encoder_out
+
+        new_order = new_order.reshape((-1, beam_size)).clone()[:, 0] // beam_size
 
         new_encoder_out: Dict[str, Tensor] = {}
 
@@ -760,7 +763,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             else None
         )
 
-        print('prev_output_tokens ***', prev_output_tokens.size())
+        # print('prev_output_tokens ***', prev_output_tokens.size())
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
             if positions is not None:
@@ -784,8 +787,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         x = x.transpose(0, 1)
 
         self_attn_padding_mask: Optional[Tensor] = None
-        print('prev_output_tokens', prev_output_tokens.size())
-        print('prev_output_tokens[0]', prev_output_tokens[0])
+        # print('prev_output_tokens', prev_output_tokens.size())
+        # print('prev_output_tokens[0]', prev_output_tokens[0])
         if self.cross_self_attention or prev_output_tokens.eq(self.padding_idx).any():
             self_attn_padding_mask = prev_output_tokens.eq(self.padding_idx)
 

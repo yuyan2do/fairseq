@@ -277,7 +277,7 @@ class MultiheadAttention(nn.Module):
             if "prev_key_padding_mask" in saved_state:
                 prev_key_padding_mask = saved_state["prev_key_padding_mask"]
             assert k is not None and v is not None
-            print('bsz', bsz)
+            # print('bsz', bsz)
             key_padding_mask = MultiheadAttention._append_prev_key_padding_mask(
                 key_padding_mask=key_padding_mask,
                 prev_key_padding_mask=prev_key_padding_mask,
@@ -375,7 +375,7 @@ class MultiheadAttention(nn.Module):
         else:
             attn = torch.bmm(attn_probs, v)
         torch.cuda.nvtx.range_pop()
-        print('attn.size()', attn.size())
+        # print('attn.size()', attn.size())
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
         if self.onnx_trace and attn.size(1) == 1:
             # when ONNX tracing a single decoder step (sequence length == 1)
@@ -422,7 +422,7 @@ class MultiheadAttention(nn.Module):
                 [prev_key_padding_mask.float(), filler.float()], dim=1
             )
         elif key_padding_mask is not None:
-            print('key_padding_mask.size()', key_padding_mask.size())
+            # print('key_padding_mask.size()', key_padding_mask.size())
             filler = torch.zeros(
                 (batch_size, src_len - key_padding_mask.size(1)),
                 device=key_padding_mask.device,
@@ -454,8 +454,7 @@ class MultiheadAttention(nn.Module):
                         if input_buffer_k.size(0) * beam_size == new_order.size(0):
                             return incremental_state
                         else:
-                            new_order = new_order.reshape((-1, beam_size))
-                            input_buffer[k] = input_buffer_k.index_select(0, new_order[:, 0])
+                            input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, beam_size)[:, 0] // beam_size)
                     else:
                         input_buffer[k] = input_buffer_k.index_select(0, new_order)
             incremental_state = self._set_input_buffer(incremental_state, input_buffer)
