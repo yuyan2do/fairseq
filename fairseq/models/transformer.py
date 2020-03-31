@@ -760,6 +760,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             else None
         )
 
+        print('prev_output_tokens ***', prev_output_tokens.size())
         if incremental_state is not None:
             prev_output_tokens = prev_output_tokens[:, -1:]
             if positions is not None:
@@ -783,6 +784,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         x = x.transpose(0, 1)
 
         self_attn_padding_mask: Optional[Tensor] = None
+        print('prev_output_tokens', prev_output_tokens.size())
+        print('prev_output_tokens[0]', prev_output_tokens[0])
         if self.cross_self_attention or prev_output_tokens.eq(self.padding_idx).any():
             self_attn_padding_mask = prev_output_tokens.eq(self.padding_idx)
 
@@ -790,6 +793,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
         for idx, layer in enumerate(self.layers):
+            torch.cuda.nvtx.range_push("layer")
             encoder_state: Optional[Tensor] = None
             if encoder_out is not None:
                 if self.layer_wise_attention:
@@ -822,6 +826,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 inner_states.append(x)
                 if layer_attn is not None and idx == alignment_layer:
                     attn = layer_attn.float().to(x)
+            torch.cuda.nvtx.range_pop()
 
         if attn is not None:
             if alignment_heads is not None:

@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import gc
 import math
 
 import torch
@@ -133,9 +134,11 @@ class SequenceGenerator(object):
         torch.cuda.nvtx.range_push("forward encoder")
         encoder_outs = model.forward_encoder(encoder_input)
         torch.cuda.nvtx.range_pop()
+        '''
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
         new_order = new_order.to(src_tokens.device).long()
         encoder_outs = model.reorder_encoder_out(encoder_outs, new_order)
+        '''
 
         # initialize buffers
         scores = src_tokens.new(bsz * beam_size, max_len + 1).float().fill_(0)
@@ -282,6 +285,33 @@ class SequenceGenerator(object):
             )
             torch.cuda.nvtx.range_pop()
             torch.cuda.nvtx.range_push("post_process")
+
+            '''
+            float16_size = 0
+            other_size = 0
+            cache_size = ""
+            for obj in gc.get_objects():
+                try:
+                    if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                        #print(type(obj), obj.size())
+                        if obj.dtype == torch.float16:
+                            float16_size += obj.numel()
+                        else:
+                            other_size += obj.numel()
+
+                        if obj.numel() > 5 * 1024 * 1024:
+                            cache_size += str(obj.dtype) + ' ' + str(obj.size()) + ' ' + str(obj.numel() / (1024*1024)) + '\t'
+                except:
+                    pass
+            float16_size = str(2 * float16_size / (1024 * 1024))
+            other_size = str(4 * other_size / (1024 * 1024))
+            print("### begin ###")
+            print(float16_size, 'MB')
+            print(other_size, 'MB')
+            print(cache_size)
+            print("### end ###")
+            '''
+
             lprobs[lprobs != lprobs] = -math.inf
 
             lprobs[:, self.pad] = -math.inf  # never select pad
