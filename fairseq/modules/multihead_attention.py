@@ -332,8 +332,9 @@ class MultiheadAttention(nn.Module):
 
         torch.cuda.nvtx.range_push("bmm_qk")
         if self.encoder_decoder_attention == True and bsz != kv_bsz:
-            attn_weights = torch.matmul(q.view(kv_bsz, -1, self.num_heads, *q.size()[1:]), k.view(kv_bsz, 1, self.num_heads, *k.size()[1:]).transpose(-1, -2))
-            attn_weights = attn_weights.view(-1, *attn_weights.size()[-2:])
+            #attn_weights = torch.matmul(q.view(kv_bsz, -1, self.num_heads, *q.size()[1:]), k.view(kv_bsz, 1, self.num_heads, *k.size()[1:]).transpose(-1, -2))
+            attn_weights = torch.einsum('bxhtd,bhsd->bxhts', q.view(kv_bsz, -1, self.num_heads, *q.size()[1:]), k.view(kv_bsz, self.num_heads, *k.size()[1:]))
+            attn_weights = attn_weights.reshape(-1, *attn_weights.size()[-2:])
         else:
             attn_weights = torch.bmm(q, k.transpose(1, 2))
         torch.cuda.nvtx.range_pop()
@@ -379,8 +380,9 @@ class MultiheadAttention(nn.Module):
         assert v is not None
         torch.cuda.nvtx.range_push("bmm_probv")
         if self.encoder_decoder_attention == True and bsz != kv_bsz:
-            attn = torch.matmul(attn_probs.view(kv_bsz, -1, self.num_heads, *attn_probs.size()[1:]), v.view(kv_bsz, 1, self.num_heads, *v.size()[1:]))
-            attn = attn.view(-1, *attn.size()[-2:])
+            #attn = torch.matmul(attn_probs.view(kv_bsz, -1, self.num_heads, *attn_probs.size()[1:]), v.view(kv_bsz, 1, self.num_heads, *v.size()[1:]))
+            attn = torch.einsum('bxhts,bhsd->bxhtd', attn_probs.view(kv_bsz, -1, self.num_heads, *attn_probs.size()[1:]), v.view(kv_bsz, self.num_heads, *v.size()[1:]))
+            attn = attn.reshape(-1, *attn.size()[-2:])
         else:
             attn = torch.bmm(attn_probs, v)
         torch.cuda.nvtx.range_pop()
@@ -461,6 +463,7 @@ class MultiheadAttention(nn.Module):
                     #if self.encoder_decoder_attention and 'mask' not in k:
                     if self.encoder_decoder_attention:
                         if input_buffer_k.size(0) * beam_size == new_order.size(0):
+                            torch.cuda.nvtx.range_pop()
                             return incremental_state
                         else:
                             input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, beam_size)[:, 0] // beam_size)
