@@ -276,8 +276,8 @@ class SequenceGenerator(object):
                     # update beam indices to take into account removed sentences
                     corr = batch_idxs - torch.arange(batch_idxs.numel()).type_as(batch_idxs)
                     reorder_state.view(-1, beam_size).add_(corr.unsqueeze(-1) * beam_size)
-                model.reorder_incremental_state(reorder_state)
-                encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state)
+                model.reorder_incremental_state(reorder_state, beam_size)
+                encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state, beam_size)
             torch.cuda.nvtx.range_pop()
 
             torch.cuda.nvtx.range_push("forward decoder")
@@ -636,19 +636,19 @@ class EnsembleModel(torch.nn.Module):
         probs = probs[:, -1, :]
         return probs, attn
 
-    def reorder_encoder_out(self, encoder_outs, new_order):
+    def reorder_encoder_out(self, encoder_outs, new_order, beam_size = 0):
         if not self.has_encoder():
             return
         return [
-            model.encoder.reorder_encoder_out(encoder_out, new_order)
+            model.encoder.reorder_encoder_out(encoder_out, new_order, beam_size)
             for model, encoder_out in zip(self.models, encoder_outs)
         ]
 
-    def reorder_incremental_state(self, new_order):
+    def reorder_incremental_state(self, new_order, beam_size=-1):
         if self.incremental_states is None:
             return
         for model in self.models:
-            model.decoder.reorder_incremental_state(self.incremental_states[model], new_order)
+            model.decoder.reorder_incremental_state(self.incremental_states[model], new_order, beam_size)
 
 
 class SequenceGeneratorWithAlignment(SequenceGenerator):

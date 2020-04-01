@@ -488,7 +488,7 @@ class TransformerEncoder(FairseqEncoder):
         )
 
     @torch.jit.export
-    def reorder_encoder_out(self, encoder_out: EncoderOut, new_order):
+    def reorder_encoder_out(self, encoder_out: EncoderOut, new_order, beam_size = 0):
         """
         Reorder encoder output according to *new_order*.
 
@@ -499,12 +499,12 @@ class TransformerEncoder(FairseqEncoder):
         Returns:
             *encoder_out* rearranged according to *new_order*
         """
-        beam_size = 4
-        if encoder_out.encoder_out is not None \
-                and encoder_out.encoder_out.size(1) * beam_size == new_order.size(0):
-            return encoder_out
+        if beam_size > 0:
+            if encoder_out.encoder_out is not None \
+                    and encoder_out.encoder_out.size(1) * beam_size == new_order.size(0):
+                return encoder_out
 
-        new_order = new_order.reshape((-1, beam_size)).clone()[:, 0] // beam_size
+            new_order = new_order.reshape((-1, beam_size)).clone()[:, 0] // beam_size
 
         new_encoder_out: Dict[str, Tensor] = {}
 
@@ -886,10 +886,11 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         self,
         incremental_state: Dict[str, Dict[str, Optional[Tensor]]],
         new_order: Tensor,
+        beam_size: Tensor,
     ):
         """Scriptable reorder incremental state in the transformer."""
         for layer in self.layers:
-            layer.reorder_incremental_state(incremental_state, new_order)
+            layer.reorder_incremental_state(incremental_state, new_order, beam_size)
 
     def upgrade_state_dict_named(self, state_dict, name):
         """Upgrade a (possibly old) state dict for new versions of fairseq."""

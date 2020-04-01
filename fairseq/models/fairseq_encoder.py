@@ -35,7 +35,7 @@ class FairseqEncoder(nn.Module):
         """
         raise NotImplementedError
 
-    def reorder_encoder_out(self, encoder_out, new_order):
+    def reorder_encoder_out(self, encoder_out, new_order, beam_size = 0):
         """
         Reorder encoder output according to `new_order`.
 
