@@ -636,7 +636,7 @@ class EnsembleModel(torch.nn.Module):
         probs = probs[:, -1, :]
         return probs, attn
 
-    def reorder_encoder_out(self, encoder_outs, new_order, beam_size = 0):
+    def reorder_encoder_out(self, encoder_outs, new_order, beam_size = -1):
         if not self.has_encoder():
             return
         return [

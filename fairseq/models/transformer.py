@@ -488,7 +488,7 @@ class TransformerEncoder(FairseqEncoder):
         )
 
     @torch.jit.export
-    def reorder_encoder_out(self, encoder_out: EncoderOut, new_order, beam_size = 0):
+    def reorder_encoder_out(self, encoder_out: EncoderOut, new_order, beam_size = -1):
         """
         Reorder encoder output according to *new_order*.
 
@@ -504,7 +504,7 @@ class TransformerEncoder(FairseqEncoder):
                     and encoder_out.encoder_out.size(1) * beam_size == new_order.size(0):
                 return encoder_out
 
-            new_order = new_order.reshape((-1, beam_size)).clone()[:, 0] // beam_size
+            new_order = new_order.reshape((-1, beam_size))[:, 0] // beam_size
 
         new_encoder_out: Dict[str, Tensor] = {}
 
