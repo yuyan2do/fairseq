@@ -136,11 +136,9 @@ class SequenceGenerator(object):
         torch.cuda.nvtx.range_push("forward encoder")
         encoder_outs = model.forward_encoder(encoder_input)
         torch.cuda.nvtx.range_pop()
-        '''
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
         new_order = new_order.to(src_tokens.device).long()
         encoder_outs = model.reorder_encoder_out(encoder_outs, new_order)
-        '''
 
         # initialize buffers
         scores = src_tokens.new(bsz * beam_size, max_len + 1).float().fill_(0)
