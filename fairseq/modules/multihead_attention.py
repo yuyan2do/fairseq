@@ -69,6 +69,8 @@ class MultiheadAttention(nn.Module):
 
         self.add_zero_attn = add_zero_attn
 
+        self.beam_size = 1
+
         self.reset_parameters()
 
         self.onnx_trace = False
@@ -460,18 +462,14 @@ class MultiheadAttention(nn.Module):
                 input_buffer_k = input_buffer[k]
                 if input_buffer_k is not None:
                     #if self.encoder_decoder_attention and 'mask' not in k:
-                    if 'beam_size' in incremental_state:
-                        beam_size = incremental_state['beam_size']
-                    else:
-                        beam_size = 1
                     if self.encoder_decoder_attention:
-                        if input_buffer_k.size(0) * beam_size == new_order.size(0):
+                        if input_buffer_k.size(0) * self.beam_size == new_order.size(0):
                             torch.cuda.nvtx.range_pop()
                             return incremental_state
-                        else:
-                            input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, beam_size)[:, 0] // beam_size)
-                    else:
-                        input_buffer[k] = input_buffer_k.index_select(0, new_order)
+                        elif self.beam_size > 1:
+                            input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, self.beam_size)[:, 0] // self.beam_size)
+                            continue
+                    input_buffer[k] = input_buffer_k.index_select(0, new_order)
             incremental_state = self._set_input_buffer(incremental_state, input_buffer)
         torch.cuda.nvtx.range_pop()
         return incremental_state
@@ -495,6 +493,13 @@ class MultiheadAttention(nn.Module):
 
     def apply_sparse_mask(attn_weights, tgt_len: int, src_len: int, bsz: int):
         return attn_weights
+
+    def set_beam_size(self, beam_size):
+        self.beam_size = beam_size
+
+    def make_generation_fast_(self,  beamable_mm_beam_size=None, **kwargs):
+        if beamable_mm_beam_size is not None:
+            self.set_beam_size(beamable_mm_beam_size)
 
     def upgrade_state_dict_named(self, state_dict, name):
         prefix = name + "." if name != "" else ""
