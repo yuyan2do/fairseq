@@ -800,7 +800,6 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         attn: Optional[Tensor] = None
         inner_states: List[Optional[Tensor]] = [x]
         for idx, layer in enumerate(self.layers):
-            torch.cuda.nvtx.range_push("layer")
             encoder_state: Optional[Tensor] = None
             if encoder_out is not None:
                 if self.layer_wise_attention:
@@ -833,7 +832,6 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 inner_states.append(x)
                 if layer_attn is not None and idx == alignment_layer:
                     attn = layer_attn.float().to(x)
-            torch.cuda.nvtx.range_pop()
 
         if attn is not None:
             if alignment_heads is not None:

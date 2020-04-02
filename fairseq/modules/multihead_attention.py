@@ -184,15 +184,9 @@ class MultiheadAttention(nn.Module):
             saved_state = None
 
         if self.self_attention:
-            torch.cuda.nvtx.range_push("q_proj")
             q = self.q_proj(query)
-            torch.cuda.nvtx.range_pop()
-            torch.cuda.nvtx.range_push("k_proj")
             k = self.k_proj(query)
-            torch.cuda.nvtx.range_pop()
-            torch.cuda.nvtx.range_push("v_proj")
             v = self.v_proj(query)
-            torch.cuda.nvtx.range_pop()
         elif self.encoder_decoder_attention:
             # encoder-decoder attention
             q = self.q_proj(query)
@@ -250,20 +244,16 @@ class MultiheadAttention(nn.Module):
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
             if "prev_key" in saved_state:
-                torch.cuda.nvtx.range_push("cat_key")
                 _prev_key = saved_state["prev_key"]
                 assert _prev_key is not None
                 kv_bsz = _prev_key.size(0)
                 prev_key = _prev_key.view(kv_bsz * self.num_heads, -1, self.head_dim)
-                #prev_key = _prev_key.view(-1, *_prev_key.size()[1:])
                 if static_kv:
                     k = prev_key
                 else:
                     assert k is not None
                     k = torch.cat([prev_key, k], dim=1)
-                torch.cuda.nvtx.range_pop()
             if "prev_value" in saved_state:
-                torch.cuda.nvtx.range_push("cat_value")
                 _prev_value = saved_state["prev_value"]
                 assert _prev_value is not None
                 assert kv_bsz == _prev_value.size(0)
@@ -273,7 +263,6 @@ class MultiheadAttention(nn.Module):
                 else:
                     assert v is not None
                     v = torch.cat([prev_value, v], dim=1)
-                torch.cuda.nvtx.range_pop()
             prev_key_padding_mask: Optional[Tensor] = None
             if "prev_key_padding_mask" in saved_state:
                 prev_key_padding_mask = saved_state["prev_key_padding_mask"]
@@ -324,13 +313,11 @@ class MultiheadAttention(nn.Module):
                     dim=1,
                 )
 
-        torch.cuda.nvtx.range_push("bmm_qk")
         if self.encoder_decoder_attention == True and bsz != kv_bsz:
             attn_weights = torch.einsum('bxhtd,bhsd->bxhts', q.view(kv_bsz, -1, self.num_heads, *q.size()[1:]), k.view(kv_bsz, self.num_heads, *k.size()[1:]))
             attn_weights = attn_weights.reshape(-1, *attn_weights.size()[-2:])
         else:
             attn_weights = torch.bmm(q, k.transpose(1, 2))
-        torch.cuda.nvtx.range_pop()
         attn_weights = MultiheadAttention.apply_sparse_mask(attn_weights, tgt_len, src_len, bsz)
 
         assert list(attn_weights.size()) == [bsz * self.num_heads, tgt_len, src_len]
@@ -352,11 +339,9 @@ class MultiheadAttention(nn.Module):
         if before_softmax:
             return attn_weights, v
 
-        torch.cuda.nvtx.range_push("softmax_weight")
         attn_weights_float = utils.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
-        torch.cuda.nvtx.range_pop()
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = F.dropout(
             attn_weights_float.type_as(attn_weights),
@@ -364,13 +349,11 @@ class MultiheadAttention(nn.Module):
             training=self.training,
         )
         assert v is not None
-        torch.cuda.nvtx.range_push("bmm_probv")
         if self.encoder_decoder_attention == True and bsz != kv_bsz:
             attn = torch.einsum('bxhts,bhsd->bxhtd', attn_probs.view(kv_bsz, -1, self.num_heads, *attn_probs.size()[1:]), v.view(kv_bsz, self.num_heads, *v.size()[1:]))
             attn = attn.reshape(-1, *attn.size()[-2:])
         else:
             attn = torch.bmm(attn_probs, v)
-        torch.cuda.nvtx.range_pop()
         assert list(attn.size()) == [bsz * self.num_heads, tgt_len, self.head_dim]
         if self.onnx_trace and attn.size(1) == 1:
             # when ONNX tracing a single decoder step (sequence length == 1)
@@ -432,10 +415,6 @@ class MultiheadAttention(nn.Module):
     def reorder_incremental_state(
         self, incremental_state: Dict[str, Dict[str, Optional[Tensor]]], new_order: Tensor
     ):
-        if self.encoder_decoder_attention == False:
-            torch.cuda.nvtx.range_push("reoder_self_attn")
-        else:
-            torch.cuda.nvtx.range_push("reoder_cross_attn")
         """Reorder buffered internal state (for incremental generation)."""
         input_buffer = self._get_input_buffer(incremental_state)
         if input_buffer is not None:
@@ -444,7 +423,6 @@ class MultiheadAttention(nn.Module):
                 if input_buffer_k is not None:
                     if self.encoder_decoder_attention:
                         if input_buffer_k.size(0) * self.beam_size == new_order.size(0):
-                            torch.cuda.nvtx.range_pop()
                             return incremental_state
                         elif self.beam_size > 1:
                             input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, self.beam_size)[:, 0] // self.beam_size)
@@ -453,7 +431,6 @@ class MultiheadAttention(nn.Module):
                     else:
                         input_buffer[k] = input_buffer_k.index_select(0, new_order)
             incremental_state = self._set_input_buffer(incremental_state, input_buffer)
-        torch.cuda.nvtx.range_pop()
         return incremental_state
 
     def _get_input_buffer(
