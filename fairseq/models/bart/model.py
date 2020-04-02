@@ -192,7 +192,6 @@ class BARTModel(TransformerModel):
         """Replace reorder_encoder_out with a dummy function."""
         if 'beamable_mm_beam_size' in kwargs and kwargs['beamable_mm_beam_size'] > 1:
             self.encoder.reorder_encoder_out = self.encoder.reorder_encoder_out_
-            pass
 
 class BARTClassificationHead(nn.Module):
     """Head for sentence-level classification tasks."""

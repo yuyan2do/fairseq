@@ -194,6 +194,11 @@ class MultiheadAttention(nn.Module):
                 assert value is None
                 k = v = None
             else:
+                if self.beam_size > 1 and bsz == key.size(1):
+                    # key is [T, bsz*beam_size, C], reduce to [T, bsz, C]
+                    key = key.view(key.size(0), -1, self.beam_size, key.size(2))[:,:,0,:]
+                    if key_padding_mask is not None:
+                        key_padding_mask = key_padding_mask.view(-1, self.beam_size, key_padding_mask.size(1))[:,0,:]
                 k = self.k_proj(key)
                 v = self.v_proj(key)
 
@@ -330,7 +335,7 @@ class MultiheadAttention(nn.Module):
 
         if key_padding_mask is not None:
             # don't attend to padding symbols
-            attn_weights = attn_weights.view(kv_bsz, self.beam_size, self.num_heads, tgt_len, src_len)
+            attn_weights = attn_weights.view(kv_bsz, -1, self.num_heads, tgt_len, src_len)
             attn_weights = attn_weights.masked_fill(
                 key_padding_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3).to(torch.bool), float("-inf")
             )
