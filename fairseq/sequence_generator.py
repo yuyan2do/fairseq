@@ -317,7 +317,7 @@ class SequenceGenerator(object):
                 # minimum length constraint (does not apply if using prefix_tokens)
                 lprobs[:, self.eos] = -math.inf
 
-            if self.no_repeat_ngram_size > 0 and step + 2 - self.no_repeat_ngram_size > 0:
+            if self.no_repeat_ngram_size > 0 and step + 2 - self.no_repeat_ngram_size >= 0:
                 # for each beam and batch sentence, generate a list of previous ngrams
                 gen_ngrams = [{} for bbsz_idx in range(bsz * beam_size)]
                 cpu_tokens = tokens.cpu()
@@ -356,7 +356,7 @@ class SequenceGenerator(object):
                     return banned_tokens_per_sample
 
                 banned_tokens = []
-                if step + 2 - self.no_repeat_ngram_size > 0:
+                if step + 2 - self.no_repeat_ngram_size >= 0:
                     # no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
                     for bbsz_idx in range(bsz * beam_size):
                         banned_tokens.extend(calculate_banned_tokens(bbsz_idx))
