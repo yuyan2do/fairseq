@@ -129,9 +129,6 @@ class SequenceGenerator(object):
             )
         assert self.min_len <= max_len, 'min_len cannot be larger than max_len, please adjust these!'
 
-        for k in model.incremental_states:
-            model.incremental_states[k]['beam_size'] = self.beam_size
-
         # compute the encoder output for each beam
         torch.cuda.nvtx.range_push("forward encoder")
         encoder_outs = model.forward_encoder(encoder_input)
@@ -268,7 +265,6 @@ class SequenceGenerator(object):
         reorder_state = None
         batch_idxs = None
         for step in range(max_len + 1):  # one extra step for EOS marker
-            # print('step', step)
             torch.cuda.nvtx.range_push("reoder_state")
             # reorder decoder internal states based on the prev choice of beams
             if reorder_state is not None:
@@ -286,32 +282,6 @@ class SequenceGenerator(object):
             )
             torch.cuda.nvtx.range_pop()
             torch.cuda.nvtx.range_push("post_process")
-
-            '''
-            float16_size = 0
-            other_size = 0
-            cache_size = ""
-            for obj in gc.get_objects():
-                try:
-                    if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                        #print(type(obj), obj.size())
-                        if obj.dtype == torch.float16:
-                            float16_size += obj.numel()
-                        else:
-                            other_size += obj.numel()
-
-                        if obj.numel() > 5 * 1024 * 1024:
-                            cache_size += str(obj.dtype) + ' ' + str(obj.size()) + ' ' + str(obj.numel() / (1024*1024)) + '\t'
-                except:
-                    pass
-            float16_size = str(2 * float16_size / (1024 * 1024))
-            other_size = str(4 * other_size / (1024 * 1024))
-            print("### begin ###")
-            print(float16_size, 'MB')
-            print(other_size, 'MB')
-            print(cache_size)
-            print("### end ###")
-            '''
 
             lprobs[lprobs != lprobs] = -math.inf
 
@@ -636,7 +606,7 @@ class EnsembleModel(torch.nn.Module):
         probs = probs[:, -1, :]
         return probs, attn
 
-    def reorder_encoder_out(self, encoder_outs, new_order, beam_size = -1):
+    def reorder_encoder_out(self, encoder_outs, new_order):
         if not self.has_encoder():
             return
         return [
