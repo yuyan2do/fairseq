@@ -447,7 +447,7 @@ class MultiheadAttention(nn.Module):
 
     @torch.jit.export
     def reorder_incremental_state(
-        self, incremental_state: Dict[str, Dict[str, Optional[Tensor]]], new_order: Tensor, beam_size: Tensor
+        self, incremental_state: Dict[str, Dict[str, Optional[Tensor]]], new_order: Tensor
     ):
         if self.encoder_decoder_attention == False:
             torch.cuda.nvtx.range_push("reoder_self_attn")
@@ -460,16 +460,16 @@ class MultiheadAttention(nn.Module):
                 input_buffer_k = input_buffer[k]
                 if input_buffer_k is not None:
                     #if self.encoder_decoder_attention and 'mask' not in k:
-                    if self.encoder_decoder_attention and beam_size > 0:
+                    if 'beam_size' in incremental_state:
+                        beam_size = incremental_state['beam_size']
+                    else:
+                        beam_size = 1
+                    if self.encoder_decoder_attention:
                         if input_buffer_k.size(0) * beam_size == new_order.size(0):
                             torch.cuda.nvtx.range_pop()
                             return incremental_state
                         else:
                             input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, beam_size)[:, 0] // beam_size)
-                        # elif "prev_key" == k or "prev_value" == k:
-                        #     input_buffer[k] = input_buffer_k.index_select(0, new_order.reshape(-1, beam_size)[:, 0] // beam_size)
-                        # else:
-                        #     input_buffer[k] = input_buffer_k.index_select(0, new_order)
                     else:
                         input_buffer[k] = input_buffer_k.index_select(0, new_order)
             incremental_state = self._set_input_buffer(incremental_state, input_buffer)

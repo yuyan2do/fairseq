@@ -368,13 +368,12 @@ class TransformerDecoderLayer(nn.Module):
         self,
         incremental_state: Dict[str, Dict[str, Optional[Tensor]]],
         new_order: Tensor,
-        beam_size: Tensor,
     ):
         """Scriptable reorder incremental state in transformer layers."""
-        self.self_attn.reorder_incremental_state(incremental_state, new_order, beam_size)
+        self.self_attn.reorder_incremental_state(incremental_state, new_order)
 
         if self.encoder_attn is not None:
-            self.encoder_attn.reorder_incremental_state(incremental_state, new_order, beam_size)
+            self.encoder_attn.reorder_incremental_state(incremental_state, new_order)
 
 
 def Linear(in_features, out_features, bias=True):

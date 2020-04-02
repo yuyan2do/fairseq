@@ -3,7 +3,6 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import gc
 import math
 
 import torch
@@ -129,6 +128,9 @@ class SequenceGenerator(object):
                 model.max_decoder_positions() - 1,
             )
         assert self.min_len <= max_len, 'min_len cannot be larger than max_len, please adjust these!'
+
+        for k in model.incremental_states:
+            model.incremental_states[k]['beam_size'] = self.beam_size
 
         # compute the encoder output for each beam
         torch.cuda.nvtx.range_push("forward encoder")
@@ -276,8 +278,8 @@ class SequenceGenerator(object):
                     # update beam indices to take into account removed sentences
                     corr = batch_idxs - torch.arange(batch_idxs.numel()).type_as(batch_idxs)
                     reorder_state.view(-1, beam_size).add_(corr.unsqueeze(-1) * beam_size)
-                model.reorder_incremental_state(reorder_state, beam_size)
-                encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state, beam_size)
+                model.reorder_incremental_state(reorder_state)
+                encoder_outs = model.reorder_encoder_out(encoder_outs, reorder_state)
             torch.cuda.nvtx.range_pop()
 
             torch.cuda.nvtx.range_push("forward decoder")
@@ -640,15 +642,15 @@ class EnsembleModel(torch.nn.Module):
         if not self.has_encoder():
             return
         return [
-            model.encoder.reorder_encoder_out(encoder_out, new_order, beam_size)
+            model.encoder.reorder_encoder_out(encoder_out, new_order)
             for model, encoder_out in zip(self.models, encoder_outs)
         ]
 
-    def reorder_incremental_state(self, new_order, beam_size=-1):
+    def reorder_incremental_state(self, new_order):
         if self.incremental_states is None:
             return
         for model in self.models:
-            model.decoder.reorder_incremental_state(self.incremental_states[model], new_order, beam_size)
+            model.decoder.reorder_incremental_state(self.incremental_states[model], new_order)
 
 
 class SequenceGeneratorWithAlignment(SequenceGenerator):
