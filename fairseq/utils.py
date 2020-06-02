@@ -364,14 +364,14 @@ def softmax(x, dim: int, onnx_trace: bool = False):
     else:
         return F.softmax(x, dim=dim, dtype=torch.float32)
 
-def adapt_softmax(x, dim: int, onnx_trace: bool = False, bias = 0):
+def adapt_softmax(x, dim: int, onnx_trace: bool = False, bias = 4):
     if x.dtype == torch.float16:
         x = x.float()
     max = torch.max(x, dim=dim, keepdim=True)[0]
     x_exp = torch.exp(x - max)
-    x_exp_sum = torch.sum(x_exp + torch.exp(bias - max), dim=dim, keepdim=True)
-
-    return x_exp / x_exp_sum
+    x_exp_sum = torch.sum(x_exp, dim=dim, keepdim=True) + torch.exp(bias - max)
+    x = x_exp / x_exp_sum
+    return x
 
 
 def log_softmax(x, dim: int, onnx_trace: bool = False):
