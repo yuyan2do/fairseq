@@ -373,11 +373,13 @@ def adapt_softmax_backup_1(x, dim: int, onnx_trace: bool = False, bias = 2):
     x = x_exp / x_exp_sum
     return x
 
-def adapt_softmax(x, dim: int, onnx_trace: bool = False):
+def adapt_softmax_backup_2(x, dim: int, onnx_trace: bool = False):
     w = torch.sigmoid(x)
     w_sum = torch.clamp((w.sum(-1, keepdim=True)), 1, 10000)
     return w / w_sum
 
+def adapt_softmax(x, dim: int, onnx_trace: bool = False):
+    return torch.sigmoid(x) * softmax(x, dim=dim, onnx_trace=onnx_trace)
 # def adapt_softmax2(x, dim: int, onnx_trace: bool = False, bias = 4):
 #     x = torch.cat([x, bias * x.new_ones(x.size()[:dim] + (1,) + x.size()[:dim][1:])], dim=1)
 #     x = softmax(x, dim=dim, onnx_trace=onnx_trace)
