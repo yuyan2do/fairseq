@@ -374,7 +374,7 @@ def adapt_softmax_backup_1(x, dim: int, onnx_trace: bool = False, bias = 2):
     return x
 
 def adapt_softmax(x, dim: int, onnx_trace: bool = False):
-    w = torch.sigmoid(x-4)
+    w = torch.sigmoid(x)
     w_sum = torch.clamp((w.sum(-1, keepdim=True)), 1, 10000)
     return w / w_sum
 
