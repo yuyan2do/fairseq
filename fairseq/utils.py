@@ -364,14 +364,19 @@ def softmax(x, dim: int, onnx_trace: bool = False):
     else:
         return F.softmax(x, dim=dim, dtype=torch.float32)
 
-def adapt_softmax(x, dim: int, onnx_trace: bool = False, bias = 2):
+def adapt_softmax_backup_1(x, dim: int, onnx_trace: bool = False, bias = 2):
     if x.dtype == torch.float16:
         x = x.float()
     max = torch.max(x, dim=dim, keepdim=True)[0]
     x_exp = torch.exp(x - max)
-    x_exp_sum = torch.sum(x_exp, dim=dim, keepdim=True) + (torch.sum((x != float("-inf")), dim=dim, keepdim=True, dtype=torch.float32).sqrt() * torch.exp(bias - max)).detach()
+    x_exp_sum = torch.sum(x_exp, dim=dim, keepdim=True) + (torch.log(3 + torch.sum((x != float("-inf")), dim=dim, keepdim=True, dtype=torch.float32)) * torch.exp(bias - max)).detach()
     x = x_exp / x_exp_sum
     return x
+
+def adapt_softmax(x, dim: int, onnx_trace: bool = False):
+    w = torch.sigmoid(x-4)
+    w_sum = torch.clamp((w.sum(-1, keepdim=True)), 1, 10000)
+    return w / w_sum
 
 # def adapt_softmax2(x, dim: int, onnx_trace: bool = False, bias = 4):
 #     x = torch.cat([x, bias * x.new_ones(x.size()[:dim] + (1,) + x.size()[:dim][1:])], dim=1)
