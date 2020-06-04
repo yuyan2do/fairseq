@@ -340,10 +340,11 @@ class MultiheadAttention(nn.Module):
         if before_softmax:
             return attn_weights, v
 
-        attn_weights_float = utils.adapt_softmax(
+        attn_weights_float = utils.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
         attn_weights = attn_weights_float.type_as(attn_weights)
+        attn_weights = attn_weights / torch.clamp(attn_weights.sum(dim=-2, keepdim=True), min=1)
         attn_probs = F.dropout(
             attn_weights,
             p=self.dropout,
