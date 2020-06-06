@@ -62,11 +62,12 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
             sample_pos = [int(random.random()*(sample_len-1)), sample_len-1]
         else:
             sample_pos = [sample_len-1]
-        masked_tokens = torch.zeros_like(sample['net_input']['prev_output_tokens'])
+        masked_tokens = torch.zeros(sample['net_input']['prev_output_tokens'].size())
         masked_tokens[:, sample_pos] = 1
-        masked_tokens = masked_tokens.bool()
+        masked_tokens_in_cpu = masked_tokens.bool()
+        masked_tokens = masked_tokens_in_cpu.to(device=sample['net_input']['prev_output_tokens'].device)
         net_output = model(**sample['net_input'], masked_tokens=masked_tokens)
-        loss, nll_loss = self.compute_loss(model, net_output, sample, masked_tokens, reduce=reduce)
+        loss, nll_loss = self.compute_loss(model, net_output, sample, masked_tokens_in_cpu, reduce=reduce)
         sample['ntokens'] = masked_tokens.sum()
         sample_size = sample['target'].size(0) if self.sentence_avg else sample['ntokens']
         logging_output = {
@@ -85,7 +86,7 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         lprobs = lprobs.view(-1, lprobs.size(-1))
         target = model.get_targets(sample, net_output)
         if masked_tokens is not None:
-            target = target[:,:masked_tokens.size(1)][masked_tokens].view(-1, 1)
+            target = target.cpu()[:,:masked_tokens.size(1)][masked_tokens].view(-1, 1).to(device=lprobs.device)
         target = target.view(-1, 1)
         loss, nll_loss = label_smoothed_nll_loss(
             lprobs, target, self.eps, ignore_index=self.padding_idx, reduce=reduce,
