@@ -259,6 +259,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         features_only: bool = False,
         alignment_layer: Optional[int] = None,
         alignment_heads: Optional[int] = None,
+        masked_tokens: Optional[Tensor] = None,
     ):
         """
         Run the forward pass for an encoder-decoder model.
@@ -279,6 +280,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
             alignment_heads=alignment_heads,
             src_lengths=src_lengths,
             return_all_hiddens=return_all_hiddens,
+            masked_tokens=masked_tokens,
         )
         return decoder_out
 
@@ -643,6 +645,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         alignment_heads: Optional[int] = None,
         src_lengths: Optional[Any] = None,
         return_all_hiddens: bool = False,
+        masked_tokens: Optional[Tensor]=None,
     ):
         """
         Args:
@@ -668,7 +671,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             alignment_heads=alignment_heads,
         )
         if not features_only:
-            x = self.output_layer(x)
+            x = self.output_layer(x, masked_tokens=masked_tokens)
         return x, extra
 
     def extract_features(
@@ -781,7 +784,11 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
         return x, {"attn": [attn], "inner_states": inner_states}
 
-    def output_layer(self, features):
+    def output_layer(self, features, masked_tokens=None):
+        if masked_tokens is not None:
+            bs, t, h = features.size()
+            features = features[masked_tokens, :]
+            features = features.view(bs, -1, h)
         """Project features to the vocabulary size."""
         if self.adaptive_softmax is None:
             # project back to size of vocabulary

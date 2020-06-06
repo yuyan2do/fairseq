@@ -6,6 +6,7 @@
 import math
 import random
 
+import torch
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
 
@@ -54,11 +55,19 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         2) the sample size, which is used as the denominator for the gradient
         3) logging outputs to display while training
         """
-        sample['ntokens'], target_len = sample['net_input']['prev_output_tokens'].size()
-        sample_pos = int(random.random()*target_len)
-        sample['net_input']['prev_output_tokens'] = sample['net_input']['prev_output_tokens'][:,:sample_pos + 1]
-        net_output = model(**sample['net_input'])
-        loss, nll_loss = self.compute_loss(model, net_output, sample, sample_pos, reduce=reduce)
+        target_len = sample['net_input']['prev_output_tokens'].size(1)
+        sample_len = int(random.random()*target_len)+1
+        sample['net_input']['prev_output_tokens'] = sample['net_input']['prev_output_tokens'][:,:sample_len]
+        if model.training:
+            sample_pos = [int(random.random()*(sample_len-1)), sample_len-1]
+        else:
+            sample_pos = [sample_len-1]
+        masked_tokens = torch.zeros_like(sample['net_input']['prev_output_tokens'])
+        masked_tokens[:, sample_pos] = 1
+        masked_tokens = masked_tokens.bool()
+        net_output = model(**sample['net_input'], masked_tokens=masked_tokens)
+        loss, nll_loss = self.compute_loss(model, net_output, sample, masked_tokens, reduce=reduce)
+        sample['ntokens'] = masked_tokens.sum()
         sample_size = sample['target'].size(0) if self.sentence_avg else sample['ntokens']
         logging_output = {
             'loss': loss.data,
@@ -69,12 +78,15 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         }
         return loss, sample_size, logging_output
 
-    def compute_loss(self, model, net_output, sample, sample_pos, reduce=True):
+    def compute_loss(self, model, net_output, sample, masked_tokens, reduce=True):
         lprobs = model.get_normalized_probs(net_output, log_probs=True)
-        lprobs = lprobs[:,-1,:]
+        if lprobs.size(1) > len(masked_tokens):
+            lprobs = lprobs[masked_tokens,:]
         lprobs = lprobs.view(-1, lprobs.size(-1))
         target = model.get_targets(sample, net_output)
-        target = target[:, sample_pos].view(-1, 1)
+        if masked_tokens is not None:
+            target = target[:,:masked_tokens.size(1)][masked_tokens].view(-1, 1)
+        target = target.view(-1, 1)
         loss, nll_loss = label_smoothed_nll_loss(
             lprobs, target, self.eps, ignore_index=self.padding_idx, reduce=reduce,
         )
