@@ -663,6 +663,12 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - the decoder's output of shape `(batch, tgt_len, vocab)`
                 - a dictionary with any model-specific outputs
         """
+        if incremental_state is not None:
+            incremental_state = None
+            masked_tokens = torch.zeros_like(prev_output_tokens)
+            masked_tokens[:, -1] = 1
+            masked_tokens = masked_tokens.bool()
+
         x, extra = self.extract_features(
             prev_output_tokens,
             encoder_out=encoder_out,
@@ -702,8 +708,6 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - the decoder's features of shape `(batch, tgt_len, embed_dim)`
                 - a dictionary with any model-specific outputs
         """
-        incremental_state = None
-
         if alignment_layer is None:
             alignment_layer = self.num_layers - 1
 
