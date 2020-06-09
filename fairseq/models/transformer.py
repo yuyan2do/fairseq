@@ -702,6 +702,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
                 - the decoder's features of shape `(batch, tgt_len, embed_dim)`
                 - a dictionary with any model-specific outputs
         """
+        incremental_state = None
+
         if alignment_layer is None:
             alignment_layer = self.num_layers - 1
 
