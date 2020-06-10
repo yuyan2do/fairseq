@@ -263,7 +263,9 @@ class SequenceGenerator(nn.Module):
             lprobs, avg_attn_scores, revised_tokens = self.model.forward_decoder(
                 tokens[:, : step + 1], encoder_outs, self.temperature
             )
-            if revised_tokens is not None and revised_tokens.size(1) > step - 5 and revised_tokens.size(1) > revised_step:
+            if revised_tokens is not None and revised_tokens.size(1) > step - 5 \
+                    and revised_tokens.size(1) > revised_step \
+                    and revised_tokens.size(1) < max_len:
                 step = revised_tokens.size(1)
                 revised_step = step
                 tokens[:, 1 : step + 1] = revised_tokens
