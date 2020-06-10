@@ -266,9 +266,11 @@ class SequenceGenerator(nn.Module):
             if revised_tokens is not None and revised_tokens.size(1) > step - 5 \
                     and revised_tokens.size(1) > revised_step \
                     and revised_tokens.size(1) < max_len:
-                step = revised_tokens.size(1)
-                revised_step = step
-                tokens[:, 1 : step + 1] = revised_tokens
+                revised_step = revised_tokens.size(1)
+                tokens = tokens.fill_(self.pad)
+                tokens[:, 0] = self.eos if bos_token is None else bos_token
+                tokens[:, 1 : revised_step + 1] = revised_tokens
+                step = revised_step
                 continue
             lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
 
