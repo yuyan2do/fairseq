@@ -240,10 +240,10 @@ class SequenceGenerator(nn.Module):
 
         reorder_state: Optional[Tensor] = None
         batch_idxs: Optional[Tensor] = None
-        step = 0
-        revised_step = -1
-        while step < max_len + 1:
-        # for step in range(max_len + 1):  # one extra step for EOS marker
+        # step = 0
+        # revised_step = -1
+        # while step < max_len + 1:
+        for step in range(max_len + 1):  # one extra step for EOS marker
             # reorder decoder internal states based on the prev choice of beams
             # print(f'step: {step}')
             if reorder_state is not None:
@@ -263,15 +263,15 @@ class SequenceGenerator(nn.Module):
             lprobs, avg_attn_scores, revised_tokens = self.model.forward_decoder(
                 tokens[:, : step + 1], encoder_outs, self.temperature
             )
-            if revised_tokens is not None and revised_tokens.size(1) > step - 5 \
-                    and revised_tokens.size(1) > revised_step \
-                    and revised_tokens.size(1) < max_len:
-                revised_step = revised_tokens.size(1)
-                tokens = tokens.fill_(self.pad)
-                tokens[:, 0] = self.eos if bos_token is None else bos_token
-                tokens[:, 1 : revised_step + 1] = revised_tokens
-                step = revised_step
-                continue
+            # if revised_tokens is not None and revised_tokens.size(1) > step - 5 \
+            #         and revised_tokens.size(1) > revised_step \
+            #         and revised_tokens.size(1) < max_len:
+            #     revised_step = revised_tokens.size(1)
+            #     tokens = tokens.fill_(self.pad)
+            #     tokens[:, 0] = self.eos if bos_token is None else bos_token
+            #     tokens[:, 1 : revised_step + 1] = revised_tokens
+            #     step = revised_step
+            #     continue
             lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
 
             lprobs[:, self.pad] = -math.inf  # never select pad
@@ -443,7 +443,7 @@ class SequenceGenerator(nn.Module):
 
             # reorder incremental state in decoder
             reorder_state = active_bbsz_idx
-            step += 1
+            # step += 1
 
         # sort by score descending
         for sent in range(len(finalized)):
@@ -766,12 +766,12 @@ class EnsembleModel(nn.Module):
             probs = probs[:, -1, :]
             if self.models_size == 1:
                 revised_tokens = None
-                changed_pos = tokens.size(1)
-                if changed_pos > 1:
-                    changed_pos = (torch.cumsum((tokens[:, 1:] != torch.argmax(decoder_out[0], dim=-1)[:, :-1]).any(dim=0),
-                                            dim=0) == 0).sum()
-                if changed_pos < tokens.size(1) - 1:
-                    revised_tokens = torch.argmax(decoder_out[0], dim=-1)[:, :changed_pos + 1]
+                # changed_pos = tokens.size(1)
+                # if changed_pos > 1:
+                #     changed_pos = (torch.cumsum((tokens[:, 1:] != torch.argmax(decoder_out[0], dim=-1)[:, :-1]).any(dim=0),
+                #                             dim=0) == 0).sum()
+                # if changed_pos < tokens.size(1) - 1:
+                #     revised_tokens = torch.argmax(decoder_out[0], dim=-1)[:, :changed_pos + 1]
                 return probs, attn, revised_tokens
 
             log_probs.append(probs)

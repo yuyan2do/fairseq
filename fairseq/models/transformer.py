@@ -666,7 +666,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """
         if incremental_state is not None:
             incremental_state = None
-            if revise or True:
+            if revise and False :
                 masked_tokens = None
             else:
                 masked_tokens = torch.zeros_like(prev_output_tokens)
