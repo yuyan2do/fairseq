@@ -240,7 +240,10 @@ class SequenceGenerator(nn.Module):
 
         reorder_state: Optional[Tensor] = None
         batch_idxs: Optional[Tensor] = None
-        for step in range(max_len + 1):  # one extra step for EOS marker
+        step = 0
+        revised_step = -1
+        while step < max_len + 1:
+        # for step in range(max_len + 1):  # one extra step for EOS marker
             # reorder decoder internal states based on the prev choice of beams
             # print(f'step: {step}')
             if reorder_state is not None:
@@ -257,9 +260,14 @@ class SequenceGenerator(nn.Module):
                     encoder_outs, reorder_state
                 )
 
-            lprobs, avg_attn_scores = self.model.forward_decoder(
+            lprobs, avg_attn_scores, revised_tokens = self.model.forward_decoder(
                 tokens[:, : step + 1], encoder_outs, self.temperature
             )
+            if revised_tokens is not None and revised_tokens.size(1) > step - 5 and revised_tokens.size(1) > revised_step:
+                step = revised_tokens.size(1)
+                revised_step = step
+                tokens[:, 1 : step + 1] = revised_tokens
+                continue
             lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
 
             lprobs[:, self.pad] = -math.inf  # never select pad
@@ -431,6 +439,7 @@ class SequenceGenerator(nn.Module):
 
             # reorder incremental state in decoder
             reorder_state = active_bbsz_idx
+            step += 1
 
         # sort by score descending
         for sent in range(len(finalized)):
@@ -752,7 +761,14 @@ class EnsembleModel(nn.Module):
             )
             probs = probs[:, -1, :]
             if self.models_size == 1:
-                return probs, attn
+                revised_tokens = None
+                changed_pos = tokens.size(1)
+                if changed_pos > 1:
+                    changed_pos = (torch.cumsum((tokens[:, 1:] != torch.argmax(decoder_out[0], dim=-1)[:, :-1]).any(dim=0),
+                                            dim=0) == 0).sum()
+                if changed_pos < tokens.size(1) - 1:
+                    revised_tokens = torch.argmax(decoder_out[0], dim=-1)[:, :changed_pos + 1]
+                return probs, attn, revised_tokens
 
             log_probs.append(probs)
             if attn is not None:
@@ -765,7 +781,8 @@ class EnsembleModel(nn.Module):
         )
         if avg_attn is not None:
             avg_attn.div_(self.models_size)
-        return avg_probs, avg_attn
+
+        return avg_probs, avg_attn, None
 
     @torch.jit.export
     def reorder_encoder_out(self, encoder_outs: Optional[List[EncoderOut]], new_order):

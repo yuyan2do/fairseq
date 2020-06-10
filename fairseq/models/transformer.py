@@ -644,8 +644,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         alignment_layer: Optional[int] = None,
         alignment_heads: Optional[int] = None,
         src_lengths: Optional[Any] = None,
-        return_all_hiddens: bool = False,
         masked_tokens: Optional[Tensor]=None,
+        return_all_hiddens: bool = False,
+        revise: bool = False,
     ):
         """
         Args:
@@ -665,9 +666,12 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """
         if incremental_state is not None:
             incremental_state = None
-            masked_tokens = torch.zeros_like(prev_output_tokens)
-            masked_tokens[:, -1] = 1
-            masked_tokens = masked_tokens.bool()
+            if revise or True:
+                masked_tokens = None
+            else:
+                masked_tokens = torch.zeros_like(prev_output_tokens)
+                masked_tokens[:, -1] = 1
+                masked_tokens = masked_tokens.bool()
 
         x, extra = self.extract_features(
             prev_output_tokens,
