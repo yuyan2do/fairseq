@@ -45,6 +45,7 @@ class InverseSquareRootSchedule(FairseqLRScheduler):
 
         # initial learning rate
         self.lr = args.warmup_init_lr
+        self.lr_update_freq = args.lr_update_freq
         self.optimizer.set_lr(self.lr)
 
     @staticmethod
@@ -55,6 +56,8 @@ class InverseSquareRootSchedule(FairseqLRScheduler):
                             help='warmup the learning rate linearly for the first N updates')
         parser.add_argument('--warmup-init-lr', default=-1, type=float, metavar='LR',
                             help='initial learning rate during warmup phase; default is args.lr')
+        parser.add_argument('--lr-update-freq', default=1, type=int, metavar='LR',
+                            help='how many step will treat as 1 step')
         # fmt: on
 
     def step(self, epoch, val_loss=None):
@@ -65,6 +68,7 @@ class InverseSquareRootSchedule(FairseqLRScheduler):
 
     def step_update(self, num_updates):
         """Update the learning rate after each update."""
+        num_updates = num_updates // self.lr_update_freq
         if num_updates < self.args.warmup_updates:
             self.lr = self.args.warmup_init_lr + num_updates*self.lr_step
         else:
