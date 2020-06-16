@@ -23,7 +23,7 @@ from fairseq.modules import gelu, gelu_accurate
 from fairseq.modules.multihead_attention import MultiheadAttention
 from torch import Tensor
 
-import pydevd
+# import pydevd
 
 logger = logging.getLogger(__name__)
 
@@ -536,7 +536,7 @@ class attention_weight_adjust(torch.autograd.Function):
         with respect to the output, and we need to compute the gradient of the loss
         with respect to the input.
         """
-        pydevd.settrace(suspend=False, trace_only_current_thread=True)
+        # pydevd.settrace(suspend=False, trace_only_current_thread=True)
         input, = ctx.saved_tensors
         grad_input = grad_output.clone()
         grad_input = torch.true_divide(grad_input, torch.clamp(input.sum(dim=-2, keepdim=True), min=1))
