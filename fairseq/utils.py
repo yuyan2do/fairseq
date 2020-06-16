@@ -541,4 +541,5 @@ class attention_weight_adjust(torch.autograd.Function):
         grad_input = grad_output.clone()
         # grad_input = torch.true_divide(grad_input, torch.clamp(input.sum(dim=-2, keepdim=True), min=1))
         grad_input = grad_input / torch.clamp(input.sum(dim=-2, keepdim=True), min=0.5)
+        grad_input = grad_input * (grad_output.norm() / grad_input.norm())
         return grad_input
