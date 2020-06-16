@@ -344,10 +344,11 @@ class MultiheadAttention(nn.Module):
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
         attn_weights = attn_weights_float.type_as(attn_weights)
-        accumulate_attn_weight = torch.cumsum(attn_weights, dim=-2)
+        # accumulate_attn_weight = torch.cumsum(attn_weights, dim=-2)
         # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach()
-        attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach() + accumulate_attn_weight - accumulate_attn_weight.detach()
-        attn_weights = attn_weights / attn_weight_adjust
+        # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach() + accumulate_attn_weight - accumulate_attn_weight.detach()
+        # attn_weights = attn_weights / attn_weight_adjust
+        attn_weights = utils.attention_weight_adjust.apply(attn_weights)
         attn_probs = F.dropout(
             attn_weights,
             p=self.dropout,

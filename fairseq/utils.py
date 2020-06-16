@@ -23,6 +23,7 @@ from fairseq.modules import gelu, gelu_accurate
 from fairseq.modules.multihead_attention import MultiheadAttention
 from torch import Tensor
 
+import pydevd
 
 logger = logging.getLogger(__name__)
 
@@ -515,3 +516,28 @@ def new_arange(x, *size):
 def get_tpu_device(args):
     import torch_xla.core.xla_model as xm
     return xm.xla_device()
+
+class attention_weight_adjust(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input)
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        pydevd.settrace(suspend=False, trace_only_current_thread=True)
+        input, = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad_input = torch.true_divide(grad_input, torch.clamp(input.sum(dim=-2, keepdim=True), min=1))
+        return grad_input
