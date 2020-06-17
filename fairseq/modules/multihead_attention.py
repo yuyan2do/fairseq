@@ -351,7 +351,7 @@ class MultiheadAttention(nn.Module):
         # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach() + accumulate_attn_weight - accumulate_attn_weight.detach()
         # attn_weights = attn_weights / attn_weight_adjust
         if self.attention_grad_adjust:
-            attn_weights = utils.attention_grad_adjust.apply(attn_weights)
+            attn_weights_float = utils.attention_grad_adjust.apply(attn_weights_float)
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = F.dropout(
             attn_weights,
