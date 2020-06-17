@@ -34,6 +34,7 @@ class TransformerEncoderLayer(nn.Module):
         self.embed_dim = args.encoder_embed_dim
         self.quant_noise = getattr(args, "quant_noise_pq", 0)
         self.quant_noise_block_size = getattr(args, "quant_noise_pq_block_size", 8)
+        self.attention_grad_adjust = getattr(args, "attention_grad_adjust", False)
         self.self_attn = self.build_self_attention(self.embed_dim, args)
         self.self_attn_layer_norm = LayerNorm(self.embed_dim)
         self.dropout = args.dropout
@@ -68,6 +69,7 @@ class TransformerEncoderLayer(nn.Module):
             self_attention=True,
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
+            attention_grad_adjust=self.attention_grad_adjust,
         )
 
     def upgrade_state_dict_named(self, state_dict, name):
@@ -167,6 +169,8 @@ class TransformerDecoderLayer(nn.Module):
 
         self.cross_self_attention = getattr(args, "cross_self_attention", False)
 
+        self.attention_grad_adjust = getattr(args, "attention_grad_adjust", False)
+
         self.self_attn = self.build_self_attention(
             self.embed_dim,
             args,
@@ -223,6 +227,7 @@ class TransformerDecoderLayer(nn.Module):
             self_attention=not getattr(args, "cross_self_attention", False),
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
+            attention_grad_adjust=self.attention_grad_adjust,
         )
 
     def build_encoder_attention(self, embed_dim, args):
@@ -235,6 +240,7 @@ class TransformerDecoderLayer(nn.Module):
             encoder_decoder_attention=True,
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
+            attention_grad_adjust=self.attention_grad_adjust,
         )
 
     def prepare_for_onnx_export_(self):

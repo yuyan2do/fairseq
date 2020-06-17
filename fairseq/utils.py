@@ -517,7 +517,7 @@ def get_tpu_device(args):
     import torch_xla.core.xla_model as xm
     return xm.xla_device()
 
-class attention_weight_adjust(torch.autograd.Function):
+class attention_grad_adjust(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
         """

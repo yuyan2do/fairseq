@@ -36,6 +36,7 @@ class MultiheadAttention(nn.Module):
         encoder_decoder_attention=False,
         q_noise=0.0,
         qn_block_size=8,
+        attention_grad_adjust=False,
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -71,6 +72,8 @@ class MultiheadAttention(nn.Module):
             self.bias_k = self.bias_v = None
 
         self.add_zero_attn = add_zero_attn
+
+        self.attention_grad_adjust = attention_grad_adjust
 
         self.reset_parameters()
 
@@ -347,7 +350,8 @@ class MultiheadAttention(nn.Module):
         # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach()
         # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach() + accumulate_attn_weight - accumulate_attn_weight.detach()
         # attn_weights = attn_weights / attn_weight_adjust
-        attn_weights = utils.attention_weight_adjust.apply(attn_weights)
+        if self.attention_grad_adjust:
+            attn_weights = utils.attention_grad_adjust.apply(attn_weights)
         attn_weights = attn_weights_float.type_as(attn_weights)
         attn_probs = F.dropout(
             attn_weights,
