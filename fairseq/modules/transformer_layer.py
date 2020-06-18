@@ -105,6 +105,7 @@ class TransformerEncoderLayer(nn.Module):
         residual = x
         if self.normalize_before:
             x = self.self_attn_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
         if attn_mask is not None:
             attn_mask = attn_mask.masked_fill(attn_mask.to(torch.bool), -1e8)
         # anything in original attn_mask = 1, becomes -1e8
@@ -126,10 +127,12 @@ class TransformerEncoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         residual = x
         if self.normalize_before:
             x = self.final_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         x = self.activation_fn(self.fc1(x))
         x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
@@ -138,6 +141,7 @@ class TransformerEncoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
         return x
 
 
@@ -278,6 +282,7 @@ class TransformerDecoderLayer(nn.Module):
         residual = x
         if self.normalize_before:
             x = self.self_attn_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
         if prev_self_attn_state is not None:
             prev_key, prev_value = prev_self_attn_state[:2]
             saved_state: Dict[str, Optional[Tensor]] = {
@@ -326,11 +331,13 @@ class TransformerDecoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         if self.encoder_attn is not None:
             residual = x
             if self.normalize_before:
                 x = self.encoder_attn_layer_norm(x)
+                x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
             if prev_attn_state is not None:
                 prev_key, prev_value = prev_attn_state[:2]
                 saved_state: Dict[str, Optional[Tensor]] = {
@@ -356,10 +363,12 @@ class TransformerDecoderLayer(nn.Module):
             x = residual + x
             if not self.normalize_before:
                 x = self.encoder_attn_layer_norm(x)
+                x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         residual = x
         if self.normalize_before:
             x = self.final_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         x = self.activation_fn(self.fc1(x))
         x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
@@ -368,6 +377,7 @@ class TransformerDecoderLayer(nn.Module):
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
+            x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
         if self.onnx_trace and incremental_state is not None:
             saved_state = self.self_attn._get_input_buffer(incremental_state)
             assert saved_state is not None

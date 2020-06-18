@@ -346,7 +346,7 @@ class MultiheadAttention(nn.Module):
         attn_weights_float = utils.softmax(
             attn_weights, dim=-1, onnx_trace=self.onnx_trace
         )
-        if self.attention_grad_adjust:
+        if self.attention_grad_adjust and False:
             # attn_weights_float = utils.attention_grad_adjust.apply(attn_weights_float)
             accumulate_attn_weight = torch.cumsum(attn_weights_float, dim=-2)
             # attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach()
