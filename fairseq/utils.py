@@ -541,7 +541,7 @@ class attention_grad_adjust(torch.autograd.Function):
         # grad_output = grad_output.float()
         grad_input = grad_output.clone()
         # grad_input = torch.true_divide(grad_input, torch.clamp(input.sum(dim=-2, keepdim=True), min=1))
-        grad_input = grad_input / torch.clamp(input.sum(dim=-2, keepdim=True), min=0.5)
+        grad_input = grad_input / torch.clamp(input.sum(dim=-2, keepdim=True), min=1.0)
         # grad_input = grad_input * torch.clamp(grad_output.max() / grad_input.max(), max=1)
         # grad_input = grad_input * (grad_output.norm() / grad_input.norm())
         # grad_input = grad_input.type_as(grad_output)
