@@ -735,10 +735,10 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         if positions is not None:
             x += positions
 
-        x = F.dropout(x, p=self.dropout, training=self.training)
-
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
+
+        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -965,7 +965,7 @@ def transformer_grad_adjust(args):
     # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
-    args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
+    args.layernorm_embedding = getattr(args, 'layernorm_embedding', False)
     args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     transformer_base(args)
 
