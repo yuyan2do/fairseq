@@ -26,8 +26,8 @@ except ImportError:
     has_fused_layernorm = False
 
 
-# def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=True, export=False):
-def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=False, export=False):
+def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=True, export=False):
+# def LayerNorm(normalized_shape, eps=1e-5, elementwise_affine=False, export=False):
     if not export and torch.cuda.is_available() and has_fused_layernorm:
         return FusedLayerNorm(normalized_shape, eps, elementwise_affine)
     return torch.nn.LayerNorm(normalized_shape, eps, elementwise_affine)

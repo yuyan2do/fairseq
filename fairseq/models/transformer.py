@@ -955,7 +955,10 @@ def transformer_base(args):
 
 @register_model_architecture("transformer", "transformer_base_grad_adjust")
 def transformer_grad_adjust(args):
-    args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
+    # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
+    args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
+    args.encoder_normalize_before = getattr(args, "decoder_normalize_before", True)
+    args.layernorm_embedding = getattr(args, 'layernorm_embedding', False)
     transformer_base(args)
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")
