@@ -221,6 +221,13 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+        with torch.no_grad():
+            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
+            [layer.fc2.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
+
+            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+            [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+            [layer.fc2.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
         return cls(args, encoder, decoder)
 
     @classmethod
@@ -728,10 +735,10 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         if positions is not None:
             x += positions
 
+        x = F.dropout(x, p=self.dropout, training=self.training)
+
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
-
-        x = F.dropout(x, p=self.dropout, training=self.training)
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
@@ -935,7 +942,7 @@ def transformer_base(args):
     args.decoder_embed_dim = getattr(args, "decoder_embed_dim", 768)
     args.decoder_ffn_embed_dim = getattr(args, "decoder_ffn_embed_dim", 4*768)
     args.decoder_attention_heads = getattr(args, "decoder_attention_heads", 12)
-    args.encoder_normalize_before = getattr(args, "decoder_normalize_before", False)
+    args.decoder_normalize_before = getattr(args, "decoder_normalize_before", False)
     args.decoder_learned_pos = getattr(args, 'decoder_learned_pos', True)
     args.attention_dropout = getattr(args, "attention_dropout", 0.1)
     args.activation_dropout = getattr(args, "activation_dropout", 0.1)
@@ -957,8 +964,9 @@ def transformer_base(args):
 def transformer_grad_adjust(args):
     # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
-    args.encoder_normalize_before = getattr(args, "decoder_normalize_before", True)
-    args.layernorm_embedding = getattr(args, 'layernorm_embedding', False)
+    args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
+    args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
+    args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     transformer_base(args)
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")
