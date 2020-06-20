@@ -966,7 +966,7 @@ def transformer_grad_adjust(args):
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
     args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
-    args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
+    # args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
     transformer_base(args)
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")
