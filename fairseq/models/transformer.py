@@ -221,13 +221,13 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
-        with torch.no_grad():
-            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
-            [layer.fc2.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
-
-            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
-            [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
-            [layer.fc2.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+        # with torch.no_grad():
+        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
+        #     [layer.fc2.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
+        #
+        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+        #     [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+        #     [layer.fc2.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
         return cls(args, encoder, decoder)
 
     @classmethod
