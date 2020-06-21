@@ -792,9 +792,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """Project features to the vocabulary size."""
         if self.adaptive_softmax is None:
             # project back to size of vocabulary
-            # return self.output_projection(features)
-            return torch.einsum('ijh,dh->ijd', features, self.layernorm_embedding(self.output_projection.weight))\
-                   / math.sqrt(features.size(-1))
+            return self.output_projection(features)
+            # return torch.einsum('ijh,dh->ijd', features, self.layernorm_embedding(self.output_projection.weight))\
+            #        / math.sqrt(features.size(-1))
         else:
             return features
 
