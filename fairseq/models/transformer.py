@@ -962,14 +962,29 @@ def transformer_base(args):
 
     base_architecture(args)
 
-@register_model_architecture("transformer", "transformer_base_grad_adjust")
-def transformer_grad_adjust(args):
+@register_model_architecture("transformer", "transformer_x_base")
+def transformer_x_base(args):
     # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
     args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
     args.no_scale_embedding = getattr(args, "no_scale_embedding", True)
     transformer_base(args)
+
+@register_model_architecture('transformer_x', 'transformer_x_base_8')
+def transformer_x_large(args):
+    args.decoder_layers = getattr(args, 'decoder_layers', 8)
+    transformer_x_base(args)
+
+@register_model_architecture('transformer_x', 'transformer_x_large')
+def transformer_x_large(args):
+    args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 1024)
+    args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 4*1024)
+    args.encoder_layers = getattr(args, 'encoder_layers', 12)
+    args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
+    args.decoder_layers = getattr(args, 'decoder_layers', 12)
+    args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 16)
+    transformer_x_base(args)
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")
 def transformer_iwslt_de_en(args):
