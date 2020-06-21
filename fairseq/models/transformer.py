@@ -984,6 +984,8 @@ def transformer_x_large(args):
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 4*1024)
     args.encoder_layers = getattr(args, 'encoder_layers', 12)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 16)
+    args.encoder_embed_dim = getattr(args, 'decoder_embed_dim', 1024)
+    args.encoder_ffn_embed_dim = getattr(args, 'decoder_ffn_embed_dim', 4*1024)
     args.decoder_layers = getattr(args, 'decoder_layers', 12)
     args.decoder_attention_heads = getattr(args, 'decoder_attention_heads', 16)
     transformer_x_base(args)
