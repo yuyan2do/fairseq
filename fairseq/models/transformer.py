@@ -792,7 +792,9 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """Project features to the vocabulary size."""
         if self.adaptive_softmax is None:
             # project back to size of vocabulary
-            return self.output_projection(features)
+            # return self.output_projection(features)
+            return torch.einsum('ijh,dh->ijd', features, self.layernorm_embedding(self.output_projection.weight))\
+                   / math.sqrt(features.size(-1))
         else:
             return features
 
@@ -966,7 +968,7 @@ def transformer_grad_adjust(args):
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
     args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
-    # args.no_scale_embedding = getattr(args, "no_scale_embedding", False)
+    args.no_scale_embedding = getattr(args, "no_scale_embedding", True)
     transformer_base(args)
 
 @register_model_architecture("transformer", "transformer_iwslt_de_en")
