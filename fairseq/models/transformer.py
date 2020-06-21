@@ -973,12 +973,12 @@ def transformer_x_base(args):
     args.decoder_layerdrop = getattr(args, "decoder_layerdrop", 0.2)
     transformer_base(args)
 
-@register_model_architecture('transformer_x', 'transformer_x_base_8')
+@register_model_architecture('transformer', 'transformer_x_base_8')
 def transformer_x_large(args):
     args.decoder_layers = getattr(args, 'decoder_layers', 8)
     transformer_x_base(args)
 
-@register_model_architecture('transformer_x', 'transformer_x_large')
+@register_model_architecture('transformer', 'transformer_x_large')
 def transformer_x_large(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 1024)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 4*1024)
