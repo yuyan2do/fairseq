@@ -46,20 +46,20 @@ class TransformerEncoderLayer(nn.Module):
             # for backwards compatibility with models that use args.relu_dropout
             self.activation_dropout = getattr(args, "relu_dropout", 0)
         self.normalize_before = args.encoder_normalize_before
-        self.fc1 = self.build_fc1(
-            self.embed_dim, args.encoder_ffn_embed_dim, self.quant_noise, self.quant_noise_block_size
-        )
-        self.fc2 = self.build_fc2(
-            args.encoder_ffn_embed_dim, self.embed_dim, self.quant_noise, self.quant_noise_block_size
-        )
+        # self.fc1 = self.build_fc1(
+        #     self.embed_dim, args.encoder_ffn_embed_dim, self.quant_noise, self.quant_noise_block_size
+        # )
+        # self.fc2 = self.build_fc2(
+        #     args.encoder_ffn_embed_dim, self.embed_dim, self.quant_noise, self.quant_noise_block_size
+        # )
 
-        self.final_layer_norm = LayerNorm(self.embed_dim)
+        # self.final_layer_norm = LayerNorm(self.embed_dim)
 
-    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
-
-    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
+    # def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
+    #     return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
+    #
+    # def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
+    #     return quant_noise(nn.Linear(input_dim, output_dim), p=q_noise, block_size=qn_block_size)
 
     def build_self_attention(self, embed_dim, args):
         return MultiheadAttention(
@@ -129,19 +129,19 @@ class TransformerEncoderLayer(nn.Module):
             x = self.self_attn_layer_norm(x)
             # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
-        residual = x
-        if self.normalize_before:
-            x = self.final_layer_norm(x)
-            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-
-        x = self.activation_fn(self.fc1(x))
-        x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
-        x = self.fc2(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            x = self.final_layer_norm(x)
-            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        # residual = x
+        # if self.normalize_before:
+        #     x = self.final_layer_norm(x)
+        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        #
+        # x = self.activation_fn(self.fc1(x))
+        # x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
+        # x = self.fc2(x)
+        # x = F.dropout(x, p=self.dropout, training=self.training)
+        # x = residual + x
+        # if not self.normalize_before:
+        #     x = self.final_layer_norm(x)
+        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
         return x
 
 
@@ -203,23 +203,23 @@ class TransformerDecoderLayer(nn.Module):
             self.encoder_attn = self.build_encoder_attention(self.embed_dim, args)
             self.encoder_attn_layer_norm = LayerNorm(self.embed_dim, export=export)
 
-        self.fc1 = self.build_fc1(
-            self.embed_dim, args.decoder_ffn_embed_dim, self.quant_noise, self.quant_noise_block_size
-        )
-        self.fc2 = self.build_fc2(
-            args.decoder_ffn_embed_dim, self.embed_dim, self.quant_noise, self.quant_noise_block_size
-        )
-
-        self.final_layer_norm = LayerNorm(self.embed_dim, export=export)
+        # self.fc1 = self.build_fc1(
+        #     self.embed_dim, args.decoder_ffn_embed_dim, self.quant_noise, self.quant_noise_block_size
+        # )
+        # self.fc2 = self.build_fc2(
+        #     args.decoder_ffn_embed_dim, self.embed_dim, self.quant_noise, self.quant_noise_block_size
+        # )
+        #
+        # self.final_layer_norm = LayerNorm(self.embed_dim, export=export)
         self.need_attn = True
 
         self.onnx_trace = False
 
-    def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
-
-    def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
-        return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
+    # def build_fc1(self, input_dim, output_dim, q_noise, qn_block_size):
+    #     return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
+    #
+    # def build_fc2(self, input_dim, output_dim, q_noise, qn_block_size):
+    #     return quant_noise(nn.Linear(input_dim, output_dim), q_noise, qn_block_size)
 
     def build_self_attention(self, embed_dim, args, add_bias_kv=False, add_zero_attn=False):
         return MultiheadAttention(
@@ -365,33 +365,33 @@ class TransformerDecoderLayer(nn.Module):
                 x = self.encoder_attn_layer_norm(x)
                 # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
-        residual = x
-        if self.normalize_before:
-            x = self.final_layer_norm(x)
-            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-
-        x = self.activation_fn(self.fc1(x))
-        x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
-        x = self.fc2(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = residual + x
-        if not self.normalize_before:
-            # x = x.clamp(min=-4, max=4).detach() + (x - x.detach())
-            # x = x.clamp(min=-4, max=4)
-            # print(x.view(-1).min(), x.view(-1).max())
-            x = self.final_layer_norm(x)
-        if self.onnx_trace and incremental_state is not None:
-            saved_state = self.self_attn._get_input_buffer(incremental_state)
-            assert saved_state is not None
-            if self_attn_padding_mask is not None:
-                self_attn_state = [
-                    saved_state["prev_key"],
-                    saved_state["prev_value"],
-                    saved_state["prev_key_padding_mask"],
-                ]
-            else:
-                self_attn_state = [saved_state["prev_key"], saved_state["prev_value"]]
-            return x, attn, self_attn_state
+        # residual = x
+        # if self.normalize_before:
+        #     x = self.final_layer_norm(x)
+        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        #
+        # x = self.activation_fn(self.fc1(x))
+        # x = F.dropout(x, p=float(self.activation_dropout), training=self.training)
+        # x = self.fc2(x)
+        # x = F.dropout(x, p=self.dropout, training=self.training)
+        # x = residual + x
+        # if not self.normalize_before:
+        #     # x = x.clamp(min=-4, max=4).detach() + (x - x.detach())
+        #     # x = x.clamp(min=-4, max=4)
+        #     # print(x.view(-1).min(), x.view(-1).max())
+        #     x = self.final_layer_norm(x)
+        # if self.onnx_trace and incremental_state is not None:
+        #     saved_state = self.self_attn._get_input_buffer(incremental_state)
+        #     assert saved_state is not None
+        #     if self_attn_padding_mask is not None:
+        #         self_attn_state = [
+        #             saved_state["prev_key"],
+        #             saved_state["prev_value"],
+        #             saved_state["prev_key_padding_mask"],
+        #         ]
+        #     else:
+        #         self_attn_state = [saved_state["prev_key"], saved_state["prev_value"]]
+        #     return x, attn, self_attn_state
         return x, attn, None
 
     def make_generation_fast_(self, need_attn: bool = False, **kwargs):
