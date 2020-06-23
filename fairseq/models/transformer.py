@@ -742,6 +742,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
 
         # B x T x C -> T x B x C
         x = x.transpose(0, 1)
+        x_input = x.detach()
 
         self_attn_padding_mask: Optional[Tensor] = None
         if self.cross_self_attention or prev_output_tokens.eq(self.padding_idx).any():
@@ -777,6 +778,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
             # average probabilities over heads
             attn = attn.mean(dim=0)
 
+        x = x - x_input
         if self.layer_norm is not None:
             x = self.layer_norm(x)
 
