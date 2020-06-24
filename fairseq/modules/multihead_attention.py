@@ -353,9 +353,14 @@ class MultiheadAttention(nn.Module):
             attn_weight_adjust = torch.clamp(accumulate_attn_weight, min=1).detach() + accumulate_attn_weight - accumulate_attn_weight.detach()
             attn_weights_float = attn_weights_float / attn_weight_adjust
         attn_weights = attn_weights_float.type_as(attn_weights)
-        if not self.encoder_decoder_attention:
-            cancel_diagonal = attn_weights.new_ones(attn_weights.size()[-2:]).fill_diagonal_(0).detach()
-            attn_weights = attn_weights * cancel_diagonal
+        # if not self.encoder_decoder_attention:
+        #     if tgt_len == src_len:
+        #         cancel_diagonal = attn_weights.new_ones(attn_weights.size()[-2:]).fill_diagonal_(0).detach()
+        #     else:
+        #         cancel_diagonal = attn_weights.new_ones([1, 1, src_len])
+        #         cancel_diagonal[-1] = 0
+        #         cancel_diagonal = cancel_diagonal.detach()
+        #     attn_weights = attn_weights * cancel_diagonal
         attn_probs = F.dropout(
             attn_weights,
             p=self.dropout,
