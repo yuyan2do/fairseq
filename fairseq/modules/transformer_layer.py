@@ -102,32 +102,32 @@ class TransformerEncoderLayer(nn.Module):
         Returns:
             encoded output of shape `(seq_len, batch, embed_dim)`
         """
-        # residual = x
-        # if self.normalize_before:
-        #     x = self.self_attn_layer_norm(x)
-        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-        # if attn_mask is not None:
-        #     attn_mask = attn_mask.masked_fill(attn_mask.to(torch.bool), -1e8)
-        # # anything in original attn_mask = 1, becomes -1e8
-        # # anything in original attn_mask = 0, becomes 0
-        # # Note that we cannot use -inf here, because at some edge cases,
-        # # the attention weight (before softmax) for some padded element in query
-        # # will become -inf, which results in NaN in model parameters
-        # # TODO: to formally solve this problem, we need to change fairseq's
-        # # MultiheadAttention. We will do this later on.
-        #
-        # x, _ = self.self_attn(
-        #     query=x,
-        #     key=x,
-        #     value=x,
-        #     key_padding_mask=encoder_padding_mask,
-        #     attn_mask=attn_mask,
-        # )
-        # x = F.dropout(x, p=self.dropout, training=self.training)
-        # x = residual + x
-        # if not self.normalize_before:
-        #     x = self.self_attn_layer_norm(x)
-        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        residual = x
+        if self.normalize_before:
+            x = self.self_attn_layer_norm(x)
+            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        if attn_mask is not None:
+            attn_mask = attn_mask.masked_fill(attn_mask.to(torch.bool), -1e8)
+        # anything in original attn_mask = 1, becomes -1e8
+        # anything in original attn_mask = 0, becomes 0
+        # Note that we cannot use -inf here, because at some edge cases,
+        # the attention weight (before softmax) for some padded element in query
+        # will become -inf, which results in NaN in model parameters
+        # TODO: to formally solve this problem, we need to change fairseq's
+        # MultiheadAttention. We will do this later on.
+
+        x, _ = self.self_attn(
+            query=x,
+            key=x,
+            value=x,
+            key_padding_mask=encoder_padding_mask,
+            attn_mask=attn_mask,
+        )
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = residual + x
+        if not self.normalize_before:
+            x = self.self_attn_layer_norm(x)
+            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         residual = x
         if self.normalize_before:
@@ -279,92 +279,91 @@ class TransformerDecoderLayer(nn.Module):
         if need_head_weights:
             need_attn = True
 
-        # residual = x
-        # if self.normalize_before:
-        #     x = self.self_attn_layer_norm(x)
-        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-        # if prev_self_attn_state is not None:
-        #     prev_key, prev_value = prev_self_attn_state[:2]
-        #     saved_state: Dict[str, Optional[Tensor]] = {
-        #         "prev_key": prev_key,
-        #         "prev_value": prev_value,
-        #     }
-        #     if len(prev_self_attn_state) >= 3:
-        #         saved_state["prev_key_padding_mask"] = prev_self_attn_state[2]
-        #     assert incremental_state is not None
-        #     self.self_attn._set_input_buffer(incremental_state, saved_state)
-        # _self_attn_input_buffer = self.self_attn._get_input_buffer(incremental_state)
-        # if self.cross_self_attention and not (
-        #     incremental_state is not None
-        #     and _self_attn_input_buffer is not None
-        #     and "prev_key" in _self_attn_input_buffer
-        # ):
-        #     if self_attn_mask is not None:
-        #         assert encoder_out is not None
-        #         self_attn_mask = torch.cat(
-        #             (x.new_zeros(x.size(0), encoder_out.size(0)), self_attn_mask), dim=1
-        #         )
-        #     if self_attn_padding_mask is not None:
-        #         if encoder_padding_mask is None:
-        #             assert encoder_out is not None
-        #             encoder_padding_mask = self_attn_padding_mask.new_zeros(
-        #                 encoder_out.size(1), encoder_out.size(0)
-        #             )
-        #         self_attn_padding_mask = torch.cat(
-        #             (encoder_padding_mask, self_attn_padding_mask), dim=1
-        #         )
-        #     assert encoder_out is not None
-        #     y = torch.cat((encoder_out, x), dim=0)
-        # else:
-        #     y = x
-        #
-        # x, attn = self.self_attn(
-        #     query=x,
-        #     key=y,
-        #     value=y,
-        #     key_padding_mask=self_attn_padding_mask,
-        #     incremental_state=incremental_state,
-        #     need_weights=False,
-        #     attn_mask=self_attn_mask,
-        # )
-        # x = F.dropout(x, p=self.dropout, training=self.training)
-        # x = residual + x
-        # if not self.normalize_before:
-        #     x = self.self_attn_layer_norm(x)
-        #     # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-        #
-        # if self.encoder_attn is not None:
-        #     residual = x
-        #     if self.normalize_before:
-        #         x = self.encoder_attn_layer_norm(x)
-        #         # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-        #     if prev_attn_state is not None:
-        #         prev_key, prev_value = prev_attn_state[:2]
-        #         saved_state: Dict[str, Optional[Tensor]] = {
-        #             "prev_key": prev_key,
-        #             "prev_value": prev_value,
-        #         }
-        #         if len(prev_attn_state) >= 3:
-        #             saved_state["prev_key_padding_mask"] = prev_attn_state[2]
-        #         assert incremental_state is not None
-        #         self.encoder_attn._set_input_buffer(incremental_state, saved_state)
-        #
-        #     x, attn = self.encoder_attn(
-        #         query=x,
-        #         key=encoder_out,
-        #         value=encoder_out,
-        #         key_padding_mask=encoder_padding_mask,
-        #         incremental_state=incremental_state,
-        #         static_kv=True,
-        #         need_weights=need_attn or (not self.training and self.need_attn),
-        #         need_head_weights=need_head_weights,
-        #     )
-        #     x = F.dropout(x, p=self.dropout, training=self.training)
-        #     x = residual + x
-        #     if not self.normalize_before:
-        #         x = self.encoder_attn_layer_norm(x)
-        #         # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
-        attn = None
+        residual = x
+        if self.normalize_before:
+            x = self.self_attn_layer_norm(x)
+            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+        if prev_self_attn_state is not None:
+            prev_key, prev_value = prev_self_attn_state[:2]
+            saved_state: Dict[str, Optional[Tensor]] = {
+                "prev_key": prev_key,
+                "prev_value": prev_value,
+            }
+            if len(prev_self_attn_state) >= 3:
+                saved_state["prev_key_padding_mask"] = prev_self_attn_state[2]
+            assert incremental_state is not None
+            self.self_attn._set_input_buffer(incremental_state, saved_state)
+        _self_attn_input_buffer = self.self_attn._get_input_buffer(incremental_state)
+        if self.cross_self_attention and not (
+            incremental_state is not None
+            and _self_attn_input_buffer is not None
+            and "prev_key" in _self_attn_input_buffer
+        ):
+            if self_attn_mask is not None:
+                assert encoder_out is not None
+                self_attn_mask = torch.cat(
+                    (x.new_zeros(x.size(0), encoder_out.size(0)), self_attn_mask), dim=1
+                )
+            if self_attn_padding_mask is not None:
+                if encoder_padding_mask is None:
+                    assert encoder_out is not None
+                    encoder_padding_mask = self_attn_padding_mask.new_zeros(
+                        encoder_out.size(1), encoder_out.size(0)
+                    )
+                self_attn_padding_mask = torch.cat(
+                    (encoder_padding_mask, self_attn_padding_mask), dim=1
+                )
+            assert encoder_out is not None
+            y = torch.cat((encoder_out, x), dim=0)
+        else:
+            y = x
+
+        x, attn = self.self_attn(
+            query=x,
+            key=y,
+            value=y,
+            key_padding_mask=self_attn_padding_mask,
+            incremental_state=incremental_state,
+            need_weights=False,
+            attn_mask=self_attn_mask,
+        )
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = residual + x
+        if not self.normalize_before:
+            x = self.self_attn_layer_norm(x)
+            # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+
+        if self.encoder_attn is not None:
+            residual = x
+            if self.normalize_before:
+                x = self.encoder_attn_layer_norm(x)
+                # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
+            if prev_attn_state is not None:
+                prev_key, prev_value = prev_attn_state[:2]
+                saved_state: Dict[str, Optional[Tensor]] = {
+                    "prev_key": prev_key,
+                    "prev_value": prev_value,
+                }
+                if len(prev_attn_state) >= 3:
+                    saved_state["prev_key_padding_mask"] = prev_attn_state[2]
+                assert incremental_state is not None
+                self.encoder_attn._set_input_buffer(incremental_state, saved_state)
+
+            x, attn = self.encoder_attn(
+                query=x,
+                key=encoder_out,
+                value=encoder_out,
+                key_padding_mask=encoder_padding_mask,
+                incremental_state=incremental_state,
+                static_kv=True,
+                need_weights=need_attn or (not self.training and self.need_attn),
+                need_head_weights=need_head_weights,
+            )
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = residual + x
+            if not self.normalize_before:
+                x = self.encoder_attn_layer_norm(x)
+                # x = x.clamp(min=-1, max=1).detach() + (x - x.detach())
 
         residual = x
         if self.normalize_before:
