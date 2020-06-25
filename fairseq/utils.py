@@ -279,8 +279,6 @@ def clip_grad_norm_(params, max_norm, aggregate_norm_fn=None) -> torch.Tensor:
     if not torch.isinf(total_norm):
         with torch.no_grad():
             for i in range(len(params)):
-                if i == 0:
-                    continue
                 p = params[i]
                 g = grads[i]
                 p_mean = params[i].mean()
