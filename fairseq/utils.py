@@ -276,17 +276,19 @@ def clip_grad_norm_(params, max_norm, aggregate_norm_fn=None) -> torch.Tensor:
         for g in grads:
             g.mul_(clip_coef)
 
-    if not torch.isinf(total_norm):
-        with torch.no_grad():
-            for i in range(len(params)):
-                if i == 0:
-                    continue
-                p = params[i]
-                g = grads[i]
-                p_mean = params[i].mean()
-                p_std = params[i].std()
-                g[(p > p_mean + 3 * p_std + 0.01) & (g < 0)] = 0
-                g[(p < p_mean - 3 * p_std - 0.01) & (g > 0)] = 0
+    # if not torch.isinf(total_norm):
+    #     with torch.no_grad():
+    #         for i in range(len(params)):
+    #             # if i == 0:
+    #             #     continue
+    #             p = params[i]
+    #             g = grads[i]
+    #             p_mean = params[i].mean()
+    #             p_std = params[i].std()
+    #             g[(p > p_mean + 3 * p_std) & (g < 0)] = 0
+    #             g[(p < p_mean - 3 * p_std) & (g > 0)] = 0
+    #             # g[(g < 0)] = 0
+    #             # g[(g > 0)] = 0
     return total_norm
 
 

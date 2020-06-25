@@ -203,6 +203,11 @@ class Adam(torch.optim.Optimizer):
 
                 p_data_fp32.addcdiv_(exp_avg, denom, value=-step_size)
 
+                # constrains param to 3 std
+                p_mean = p_data_fp32.mean()
+                p_std = p_data_fp32.std()
+                p_data_fp32.clamp_(min=p_mean - 3 * p_std, max=p_mean + 3 * p_std)
+
                 if p.data.dtype in {torch.float16, torch.bfloat16}:
                     p.data.copy_(p_data_fp32)
 
