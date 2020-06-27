@@ -198,21 +198,21 @@ class Adam(torch.optim.Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
                 step_size = group['lr'] * math.sqrt(bias_correction2) / bias_correction1
 
-                old_p_std = p_data_fp32.std().clamp_(min=0.03)
+                # old_p_std = p_data_fp32.std().clamp_(min=0.03)
                 if group['weight_decay'] != 0:
                     p_data_fp32.add_(p_data_fp32, alpha=-group['weight_decay'] * group['lr'])
 
                 p_data_fp32.addcdiv_(exp_avg, denom, value=-step_size)
 
                 # constrains param to 3 std
-                # p_mean = p_data_fp32.mean()
-                # p_std = p_data_fp32.std()
-                # p_data_fp32.clamp_(min=p_mean - 3 * p_std, max=p_mean + 3 * p_std)
+                p_mean = p_data_fp32.mean()
+                p_std = p_data_fp32.std()
+                p_data_fp32.clamp_(min=p_mean - 2 * p_std, max=p_mean + 2 * p_std)
 
                 # rescale std
-                p_std = p_data_fp32.std()
-                if p_std > old_p_std:
-                    p_data_fp32.mul_(old_p_std / p_std)
+                # p_std = p_data_fp32.std()
+                # if p_std > old_p_std:
+                #     p_data_fp32.mul_(old_p_std / p_std)
                 # p_data_fp32.clamp_(min=p_mean - 3 * p_std, max=p_mean + 3 * p_std)
 
                 if p.data.dtype in {torch.float16, torch.bfloat16}:
