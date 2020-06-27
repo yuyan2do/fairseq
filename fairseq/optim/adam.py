@@ -210,7 +210,9 @@ class Adam(torch.optim.Optimizer):
 
                 p_max = p_mean + 3 * p_std
                 p_min = p_mean - 3 * p_std
-                exp_avg[(p_data_fp32 > p_max) | (p_data_fp32 < p_min)] = 0
+
+                index = ((p_data_fp32 > p_max) & (exp_avg < 0)) | ((p_data_fp32 < p_min) & (exp_avg > 0))
+                exp_avg[index] *= -1
                 p_data_fp32.clamp_(min=p_min, max=p_max)
 
                 # rescale std
