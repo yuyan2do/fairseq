@@ -262,42 +262,22 @@ def clip_grad_norm_(params, max_norm, aggregate_norm_fn=None) -> torch.Tensor:
         else:
             return torch.tensor(0.)
 
-    max_layer_norm = 0
-    # per layer norm
-    for g in grads:
-        total_norm = torch.norm(g)
-        max_layer_norm = max(max_layer_norm, total_norm)
-        if max_norm > 0:
-            max_norm = float(max_norm)
-            clip_coef = (max_norm / (total_norm + 1e-6)).clamp_(max=1)
-            if clip_coef < 1:
-                g.mul_(clip_coef)
+    if len(grads) == 1:
+        total_norm = torch.norm(grads[0], p=2, dtype=torch.float32)
+    else:
+        total_norm = torch.norm(
+            torch.stack([torch.norm(g, p=2, dtype=torch.float32) for g in grads])
+        )
 
-    return max_layer_norm
-    # if len(grads) == 1:
-    #     total_norm = torch.norm(grads[0])
-    # else:
-    #     a = torch.stack([torch.norm(g) for g in grads])
-    #     total_norm = torch.norm(torch.stack([torch.norm(g) for g in grads]))
-    #
-    # if aggregate_norm_fn is not None:
-    #     total_norm = aggregate_norm_fn(total_norm)
+    if aggregate_norm_fn is not None:
+        total_norm = aggregate_norm_fn(total_norm)
 
-
-    # if not torch.isinf(total_norm):
-    #     with torch.no_grad():
-    #         for i in range(len(params)):
-    #             # if i == 0:
-    #             #     continue
-    #             p = params[i]
-    #             g = grads[i]
-    #             p_mean = params[i].mean()
-    #             p_std = params[i].std()
-    #             g[(p > p_mean + 3 * p_std) & (g < 0)] = 0
-    #             g[(p < p_mean - 3 * p_std) & (g > 0)] = 0
-    #             # g[(g < 0)] = 0
-    #             # g[(g > 0)] = 0
-    # return total_norm
+    if max_norm > 0:
+        max_norm = float(max_norm)
+        clip_coef = (max_norm / (total_norm + 1e-6)).clamp_(max=1)
+        for g in grads:
+            g.mul_(clip_coef)
+    return total_norm
 
 
 def fill_with_neg_inf(t):
