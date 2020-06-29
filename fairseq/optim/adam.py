@@ -205,15 +205,15 @@ class Adam(torch.optim.Optimizer):
                 p_data_fp32.addcdiv_(exp_avg, denom, value=-step_size)
 
                 # constrains param to 3 std
-                p_mean = p_data_fp32.mean()
-                p_std = p_data_fp32.std()
-
-                p_max = p_mean + 3 * p_std
-                p_min = p_mean - 3 * p_std
-
-                index = ((p_data_fp32 > p_max) & (exp_avg < 0)) | ((p_data_fp32 < p_min) & (exp_avg > 0))
-                exp_avg[index] *= -1
-                p_data_fp32.clamp_(min=p_min, max=p_max)
+                # p_mean = p_data_fp32.mean()
+                # p_std = p_data_fp32.std()
+                #
+                # p_max = p_mean + 3 * p_std
+                # p_min = p_mean - 3 * p_std
+                #
+                # index = ((p_data_fp32 > p_max) & (exp_avg < 0)) | ((p_data_fp32 < p_min) & (exp_avg > 0))
+                # exp_avg[index] *= -1
+                # p_data_fp32.clamp_(min=p_min, max=p_max)
 
                 # rescale std
                 # p_std = p_data_fp32.std()
