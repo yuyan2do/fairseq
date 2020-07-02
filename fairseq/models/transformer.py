@@ -221,13 +221,13 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
-        # with torch.no_grad():
-        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
-        #     [layer.fc2.weight.mul_(1 / math.sqrt(args.encoder_layers)) for layer in encoder.layers]
-        #
-        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
-        #     [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
-        #     [layer.fc2.weight.mul_(1 / math.sqrt(args.decoder_layers)) for layer in decoder.layers]
+        with torch.no_grad():
+            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
+            [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
+
+            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
+            [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
+            [layer.fc2.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
         return cls(args, encoder, decoder)
 
     @classmethod
@@ -788,6 +788,10 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         if self.project_out_dim is not None:
             x = self.project_out_dim(x)
 
+        # max_activate = torch.max(
+        #     torch.stack([torch.max(x) for x in inner_states])
+        # )
+        # print("max_activate", max_activate.item())
         return x, {"attn": [attn], "inner_states": inner_states}
 
     def output_layer(self, features):
