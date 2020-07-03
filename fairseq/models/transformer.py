@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+# import pydevd
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -221,13 +222,13 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
-        with torch.no_grad():
-            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
-            [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
-
-            [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
-            [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
-            [layer.fc2.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
+        # with torch.no_grad():
+        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
+        #     [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
+        #
+        #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
+        #     [layer.encoder_attn.out_proj.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
+        #     [layer.fc2.weight.mul_(1 / math.sqrt(3*args.decoder_layers)) for layer in decoder.layers]
         return cls(args, encoder, decoder)
 
     @classmethod
@@ -376,6 +377,7 @@ class TransformerEncoder(FairseqEncoder):
         x = embed = self.embed_scale * self.embed_tokens(src_tokens)
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
+        x = ScaleDownGrad.apply(x)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -430,6 +432,7 @@ class TransformerEncoder(FairseqEncoder):
         if self.layer_norm is not None:
             x = self.layer_norm(x)
 
+        x = ScaleDownGrad.apply(x)
         return EncoderOut(
             encoder_out=x,  # T x B x C
             encoder_padding_mask=encoder_padding_mask,  # B x T
@@ -735,6 +738,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         if positions is not None:
             x += positions
 
+        x = ScaleDownGrad.apply(x)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
 
@@ -798,7 +802,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """Project features to the vocabulary size."""
         if self.adaptive_softmax is None:
             # project back to size of vocabulary
-            return self.output_projection(features)
+            # return self.output_projection(features)
+            return torch.einsum('ijh,dh->ijd', features, ScaleDownGrad.apply(self.output_projection.weight))
             # return torch.einsum('ijh,dh->ijd', features, self.layernorm_embedding(self.output_projection.weight))\
             #        / math.sqrt(features.size(-1))
         else:
@@ -1046,3 +1051,28 @@ def transformer_wmt_en_de_big_t2t(args):
     args.attention_dropout = getattr(args, "attention_dropout", 0.1)
     args.activation_dropout = getattr(args, "activation_dropout", 0.1)
     transformer_vaswani_wmt_en_de_big(args)
+
+class ScaleDownGrad(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        # ctx.save_for_backward(input)
+        # return input.clamp(min=0)
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        # pydevd.settrace(suspend=False, trace_only_current_thread=True)
+        grad_input = grad_output.clone().mul_(1.0/math.sqrt(6))
+        # grad_input = grad_output.clone()
+        return grad_input
