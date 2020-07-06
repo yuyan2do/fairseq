@@ -222,7 +222,10 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
-        # with torch.no_grad():
+        with torch.no_grad():
+            encoder.embed_tokens.weight.mul_(math.sqrt(args.encoder_embed_dim))
+            encoder.embed_positions.weight.mul_(math.sqrt(args.encoder_embed_dim) / 2)
+            decoder.embed_positions.weight.mul_(math.sqrt(args.encoder_embed_dim) / 2)
         #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #     [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #
@@ -377,7 +380,7 @@ class TransformerEncoder(FairseqEncoder):
         x = embed = self.embed_scale * self.embed_tokens(src_tokens)
         if self.embed_positions is not None:
             x = embed + self.embed_positions(src_tokens)
-        x = ScaleDownGrad.apply(x)
+        # x = ScaleDownGrad.apply(x)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -432,7 +435,7 @@ class TransformerEncoder(FairseqEncoder):
         if self.layer_norm is not None:
             x = self.layer_norm(x)
 
-        x = ScaleDownGrad.apply(x)
+        # x = ScaleDownGrad.apply(x)
         return EncoderOut(
             encoder_out=x,  # T x B x C
             encoder_padding_mask=encoder_padding_mask,  # B x T
@@ -679,6 +682,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         )
         if not features_only:
             x = self.output_layer(x)
+        x = x / math.sqrt(self.args.encoder_embed_dim)
         return x, extra
 
     def extract_features(
@@ -738,7 +742,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         if positions is not None:
             x += positions
 
-        x = ScaleDownGrad.apply(x)
+        # x = ScaleDownGrad.apply(x)
         if self.layernorm_embedding is not None:
             x = self.layernorm_embedding(x)
 
@@ -802,8 +806,8 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         """Project features to the vocabulary size."""
         if self.adaptive_softmax is None:
             # project back to size of vocabulary
-            # return self.output_projection(features)
-            return torch.einsum('ijh,dh->ijd', features, ScaleDownGrad.apply(self.output_projection.weight))
+            return self.output_projection(features)
+            # return torch.einsum('ijh,dh->ijd', features, ScaleDownGrad.apply(self.output_projection.weight))
             # return torch.einsum('ijh,dh->ijd', features, self.layernorm_embedding(self.output_projection.weight))\
             #        / math.sqrt(features.size(-1))
         else:
