@@ -1073,7 +1073,8 @@ class ScaleDownGrad(torch.autograd.Function):
         with respect to the input.
         """
         # pydevd.settrace(suspend=False, trace_only_current_thread=True)
-        grad_input = grad_output.clone().mul_(1.0/6)
+        grad_input = grad_output.clone()
+        # grad_input = grad_output.clone().mul_(1.0/6)
         # grad_input = grad_output.clone().mul_(1.0/math.sqrt(6))
         # grad_input = grad_output.clone()
         return grad_input
