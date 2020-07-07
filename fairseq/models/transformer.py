@@ -223,9 +223,11 @@ class TransformerModel(FairseqEncoderDecoderModel):
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
         with torch.no_grad():
-            encoder.embed_tokens.weight.mul_(math.sqrt(args.encoder_embed_dim))
-            encoder.embed_positions.weight.mul_(math.sqrt(args.encoder_embed_dim) / 2)
-            decoder.embed_positions.weight.mul_(math.sqrt(args.encoder_embed_dim) / 2)
+            tokens_scale = math.sqrt(args.encoder_embed_dim) / 2
+            positions_scale = tokens_scale / 2
+            encoder.embed_tokens.weight.mul_(tokens_scale)
+            encoder.embed_positions.weight.mul_(positions_scale)
+            decoder.embed_positions.weight.mul_(positions_scale)
         #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #     [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #
