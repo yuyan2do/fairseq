@@ -684,7 +684,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         )
         if not features_only:
             x = self.output_layer(x)
-        x = x / (math.sqrt(self.args.encoder_embed_dim) / 3)
+        x = x / (math.sqrt(self.args.encoder_embed_dim) / 2)
         return x, extra
 
     def extract_features(
