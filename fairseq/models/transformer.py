@@ -223,8 +223,8 @@ class TransformerModel(FairseqEncoderDecoderModel):
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
         with torch.no_grad():
-            tokens_scale = math.sqrt(args.encoder_embed_dim) / 2
-            positions_scale = tokens_scale / 2
+            tokens_scale = math.sqrt(args.encoder_embed_dim) / 3
+            positions_scale = tokens_scale / 3
             encoder.embed_tokens.weight.mul_(tokens_scale)
             encoder.embed_positions.weight.mul_(positions_scale)
             decoder.embed_positions.weight.mul_(positions_scale)
@@ -684,7 +684,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         )
         if not features_only:
             x = self.output_layer(x)
-        x = x / (math.sqrt(self.args.encoder_embed_dim) / 2)
+        x = x / (math.sqrt(self.args.encoder_embed_dim) / 3)
         return x, extra
 
     def extract_features(
