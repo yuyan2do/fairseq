@@ -222,12 +222,25 @@ class TransformerModel(FairseqEncoderDecoderModel):
 
         encoder = cls.build_encoder(args, src_dict, encoder_embed_tokens)
         decoder = cls.build_decoder(args, tgt_dict, decoder_embed_tokens)
+
+        def clip_param(self):
+            if 'Embedding' in str(self) or 'Norm' in str(self):
+                return
+            if hasattr(self, 'weight') and self.weight.size()[0] < 2000:
+                self.weight.mul_(1 / math.sqrt(6))
+                # w_mean = self.weight.mean()
+                # w_std = self.weight.std()
+                # self.weight.clamp_(min=w_mean - 3 * w_std, max=w_mean + 3 * w_std)
+
         with torch.no_grad():
-            tokens_scale = math.sqrt(args.encoder_embed_dim) / 2
-            positions_scale = tokens_scale / math.sqrt(2)
+            tokens_scale = math.sqrt(args.encoder_embed_dim) / 3
+            positions_scale = tokens_scale / math.sqrt(3)
             encoder.embed_tokens.weight.mul_(tokens_scale)
             encoder.embed_positions.weight.mul_(positions_scale)
             decoder.embed_positions.weight.mul_(positions_scale)
+
+            encoder.apply(clip_param)
+            decoder.apply(clip_param)
         #     [layer.self_attn.out_proj.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #     [layer.fc2.weight.mul_(1 / math.sqrt(2*args.encoder_layers)) for layer in encoder.layers]
         #
@@ -279,6 +292,7 @@ class TransformerModel(FairseqEncoderDecoderModel):
         Copied from the base class, but without ``**kwargs``,
         which are not supported by TorchScript.
         """
+
         encoder_out = self.encoder(
             src_tokens,
             src_lengths=src_lengths,
@@ -684,7 +698,7 @@ class TransformerDecoder(FairseqIncrementalDecoder):
         )
         if not features_only:
             x = self.output_layer(x)
-        x = x / (math.sqrt(self.args.encoder_embed_dim) / 2)
+        x = x / (math.sqrt(self.args.encoder_embed_dim) / 3)
         return x, extra
 
     def extract_features(
@@ -984,7 +998,7 @@ def transformer_x_base(args):
     # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
-    args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
+    args.layernorm_embedding = getattr(args, 'layernorm_embedding', False)
     args.no_scale_embedding = getattr(args, "no_scale_embedding", True)
     transformer_base(args)
 
