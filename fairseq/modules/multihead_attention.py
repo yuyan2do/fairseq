@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+# import pydevd
 import math
 from typing import Dict, Optional, Tuple
 
@@ -153,6 +154,7 @@ class MultiheadAttention(nn.Module):
             # A workaround for quantization to work. Otherwise JIT compilation
             # treats bias in linear module as method.
             and not torch.jit.is_scripting()
+            and False
         ):
             assert key is not None and value is not None
             return F.multi_head_attention_forward(
@@ -245,6 +247,7 @@ class MultiheadAttention(nn.Module):
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
+            v = GradLayerNorm.apply(v)
 
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
@@ -475,3 +478,28 @@ class MultiheadAttention(nn.Module):
 
         for key, value in items_to_add.items():
             state_dict[key] = value
+
+class GradLayerNorm(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        return input
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        # pydevd.settrace(suspend=False, trace_only_current_thread=True)
+        # with torch.no_grad():
+        # grad_input = (grad_output - grad_output.mean(dim=-1, keepdim=True)) / torch.sqrt(grad_output.var(dim=-1, keepdim=True) + 1e-5)
+        grad_input = grad_output.clone().add_(-grad_output.mean(dim=-1, keepdim=True)).div_(torch.sqrt((grad_output.var(dim=-1, keepdim=True) + 1e-5) / (grad_output.var() + 1e-5)))
+        return grad_input
+        # return grad_output.clone()
