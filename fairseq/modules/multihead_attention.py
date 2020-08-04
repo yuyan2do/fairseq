@@ -498,8 +498,8 @@ class GradLayerNorm(torch.autograd.Function):
         with respect to the input.
         """
         # pydevd.settrace(suspend=False, trace_only_current_thread=True)
-        # with torch.no_grad():
         # grad_input = (grad_output - grad_output.mean(dim=-1, keepdim=True)) / torch.sqrt(grad_output.var(dim=-1, keepdim=True) + 1e-5)
-        grad_input = grad_output.clone().add_(-grad_output.mean(dim=-1, keepdim=True)).div_(torch.sqrt((grad_output.var(dim=-1, keepdim=True) + 1e-5) / (grad_output.var() + 1e-5)))
+        adjust_range = ((grad_output.var() + 1e-5) / (grad_output.var(dim=-1, keepdim=True) + 1e-5)).sqrt_().clamp_(0.3, 3)
+        # grad_input = grad_output.clone().add_(-grad_output.mean(dim=-1, keepdim=True)).mul_(adjust_range)
+        grad_input = grad_output.clone().mul_(adjust_range)
         return grad_input
-        # return grad_output.clone()
