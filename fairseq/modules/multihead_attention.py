@@ -247,7 +247,7 @@ class MultiheadAttention(nn.Module):
                 .view(-1, bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            v = GradLayerNorm.apply(v)
+            # v = GradLayerNorm.apply(v)
 
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)

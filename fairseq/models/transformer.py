@@ -976,7 +976,7 @@ def transformer_x_base(args):
     # args.attention_grad_adjust = getattr(args, 'attention_grad_adjust', True)
     args.encoder_normalize_before = getattr(args, "encoder_normalize_before", True)
     args.decoder_normalize_before = getattr(args, "decoder_normalize_before", True)
-    args.layernorm_embedding = getattr(args, 'layernorm_embedding', False)
+    args.layernorm_embedding = getattr(args, 'layernorm_embedding', True)
     args.no_scale_embedding = getattr(args, "no_scale_embedding", True)
     transformer_base(args)
 
