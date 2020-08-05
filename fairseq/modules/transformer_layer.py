@@ -122,6 +122,7 @@ class TransformerEncoderLayer(nn.Module):
             attn_mask=attn_mask,
         )
         x = self.dropout_module(x)
+        x = x * torch.sigmoid(-residual * x)
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
@@ -134,6 +135,7 @@ class TransformerEncoderLayer(nn.Module):
         x = self.activation_dropout_module(x)
         x = self.fc2(x)
         x = self.dropout_module(x)
+        x = x * torch.sigmoid(-residual * x)
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
@@ -320,6 +322,7 @@ class TransformerDecoderLayer(nn.Module):
             attn_mask=self_attn_mask,
         )
         x = self.dropout_module(x)
+        x = x * torch.sigmoid(-residual * x)
         x = residual + x
         if not self.normalize_before:
             x = self.self_attn_layer_norm(x)
@@ -350,6 +353,7 @@ class TransformerDecoderLayer(nn.Module):
                 need_head_weights=need_head_weights,
             )
             x = self.dropout_module(x)
+            x = x * torch.sigmoid(-residual * x)
             x = residual + x
             if not self.normalize_before:
                 x = self.encoder_attn_layer_norm(x)
@@ -362,6 +366,7 @@ class TransformerDecoderLayer(nn.Module):
         x = self.activation_dropout_module(x)
         x = self.fc2(x)
         x = self.dropout_module(x)
+        x = x * torch.sigmoid(-residual * x)
         x = residual + x
         if not self.normalize_before:
             x = self.final_layer_norm(x)
