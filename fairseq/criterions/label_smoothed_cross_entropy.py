@@ -5,11 +5,40 @@
 
 import math
 
+import torch
+
 from fairseq import metrics, utils
 from fairseq.criterions import FairseqCriterion, register_criterion
+from fairseq.models.roberta import RobertaModel
 
 
 def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=True):
+    if target.dim() == lprobs.dim() - 1:
+        target = target.unsqueeze(-1)
+    nll_loss = -lprobs.gather(dim=-1, index=target)
+    if epsilon > 0:
+        smooth_loss = -lprobs.sum(dim=-1, keepdim=True)
+    if ignore_index is not None:
+        pad_mask = target.eq(ignore_index)
+        nll_loss.masked_fill_(pad_mask, 0.)
+        if epsilon > 0:
+            smooth_loss.masked_fill_(pad_mask, 0.)
+    else:
+        nll_loss = nll_loss.squeeze(-1)
+        if epsilon > 0:
+            smooth_loss = smooth_loss.squeeze(-1)
+    if reduce:
+        nll_loss = nll_loss.sum()
+        if epsilon > 0:
+            smooth_loss = smooth_loss.sum()
+    if epsilon > 0:
+        eps_i = epsilon / lprobs.size(-1)
+        loss = (1. - epsilon) * nll_loss + eps_i * smooth_loss
+    else:
+        loss = nll_loss
+    return loss, nll_loss
+
+def distribution_loss(lprobs, target, epsilon, ignore_index=None, reduce=True):
     if target.dim() == lprobs.dim() - 1:
         target = target.unsqueeze(-1)
     nll_loss = -lprobs.gather(dim=-1, index=target)
@@ -28,14 +57,22 @@ def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=T
     loss = (1. - epsilon) * nll_loss + eps_i * smooth_loss
     return loss, nll_loss
 
-
 @register_criterion('label_smoothed_cross_entropy')
 class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
 
-    def __init__(self, task, sentence_avg, label_smoothing):
+    def __init__(self, task, sentence_avg, label_smoothing, distribution_smoothing):
         super().__init__(task)
         self.sentence_avg = sentence_avg
         self.eps = label_smoothing
+        self.distribution_smoothing = distribution_smoothing
+        # roberta = torch.hub.load('pytorch/fairseq', 'roberta.large')
+        self.roberta = RobertaModel.from_pretrained('/datadrive/yyua/model/roberta.base', checkpoint_file='model.pt')
+        self.roberta.eval()  # disable dropout (or leave in train mode to finetune)
+        def _apply(m):
+            if hasattr(m, 'make_generation_fast_') and m != self:
+                m.p = 0.1
+                m.apply_during_inference = True
+        self.roberta.apply(_apply)
 
     @staticmethod
     def add_args(parser):
@@ -43,6 +80,7 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         # fmt: off
         parser.add_argument('--label-smoothing', default=0., type=float, metavar='D',
                             help='epsilon for label smoothing, 0 means no label smoothing')
+        parser.add_argument("--distribution-smoothing", default=False, action="store_true")
         # fmt: on
 
     def forward(self, model, sample, reduce=True):
@@ -53,8 +91,21 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         2) the sample size, which is used as the denominator for the gradient
         3) logging outputs to display while training
         """
+
         net_output = model(**sample['net_input'])
-        loss, nll_loss = self.compute_loss(model, net_output, sample, reduce=reduce)
+        if self.distribution_smoothing:
+            with torch.no_grad():
+                last_layer_features = self.roberta.extract_features(sample["target"])
+                logit = self.roberta.model.encoder.lm_head(last_layer_features)
+                predict = torch.nn.functional.softmax(logit, dim=-1)
+                top_predict = torch.topk(predict, 3, dim=-1)
+                del last_layer_features
+                del logit
+                del predict
+            loss, nll_loss = self.compute_distribution_loss(model, net_output, sample, top_predict, reduce=reduce)
+        else:
+            loss, nll_loss = self.compute_loss(model, net_output, sample, reduce=reduce)
+
         sample_size = sample['target'].size(0) if self.sentence_avg else sample['ntokens']
         logging_output = {
             'loss': loss.data,
@@ -72,6 +123,26 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         loss, nll_loss = label_smoothed_nll_loss(
             lprobs, target, self.eps, ignore_index=self.padding_idx, reduce=reduce,
         )
+        return loss, nll_loss
+
+    def compute_distribution_loss(self, model, net_output, sample, top_predict, reduce=True):
+        lprobs = model.get_normalized_probs(net_output, log_probs=True)
+        lprobs = lprobs.view(-1, lprobs.size(-1))
+        target = model.get_targets(sample, net_output).view(-1, 1)
+
+        top_predict_value, top_predict_index = top_predict
+        topk = top_predict_value.size(-1)
+        distribution_loss = -lprobs.gather(dim=-1, \
+            index=top_predict_index.view(-1, topk)) * top_predict_value.view(-1, topk)
+        pad_mask = target.eq(self.padding_idx)
+        distribution_loss.masked_fill_(pad_mask, 0.)
+        if reduce:
+            distribution_loss = distribution_loss.sum()
+
+        loss, nll_loss = label_smoothed_nll_loss(
+            lprobs, target, 0, ignore_index=self.padding_idx, reduce=reduce,
+        )
+        loss = (1. - self.eps) * nll_loss + self.eps * distribution_loss
         return loss, nll_loss
 
     @staticmethod
