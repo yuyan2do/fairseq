@@ -95,7 +95,10 @@ class LabelSmoothedCrossEntropyCriterion(FairseqCriterion):
         net_output = model(**sample['net_input'])
         if self.distribution_smoothing:
             with torch.no_grad():
-                last_layer_features = self.roberta.extract_features(sample["target"])
+                masked_target = sample["target"].clone()
+                mask = torch.cuda.FloatTensor(masked_target.size()).uniform_() < 0.15
+                masked_target[mask] = self.roberta.task.mask_idx
+                last_layer_features = self.roberta.extract_features(masked_target)
                 logit = self.roberta.model.encoder.lm_head(last_layer_features)
                 predict = torch.nn.functional.softmax(logit, dim=-1)
                 top_predict = torch.topk(predict, 3, dim=-1)
