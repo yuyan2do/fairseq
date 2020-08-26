@@ -3,6 +3,7 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
+    "justMyCode":false,
     "configurations": [
         {
             "name": "Python: Current File",
@@ -18,7 +19,8 @@
             "program": "/datadrive/yyua/code/git.yuyan2do/fairseq/fairseq_cli/train.py",
             "args": [
                 "--fp16",
-                "--distribution-smoothing",
+                "--distribution-smoothing-topk",
+                "8",
                 "--task",
                 "translation",
                 "--arch",
