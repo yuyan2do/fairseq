@@ -195,6 +195,7 @@ def _main(cfg: DictConfig, output_file):
         if "constraints" in sample:
             constraints = sample["constraints"]
 
+        torch.cuda.nvtx.range_push("inference_step")
         gen_timer.start()
         hypos = task.inference_step(
             generator,
@@ -205,6 +206,10 @@ def _main(cfg: DictConfig, output_file):
         )
         num_generated_tokens = sum(len(h[0]["tokens"]) for h in hypos)
         gen_timer.stop(num_generated_tokens)
+        torch.cuda.nvtx.range_pop()
+
+        hypos = [h[:cfg.generation.nbest] for h in hypos]
+        hypos = utils.move_to_cpu(hypos) if use_cuda else hypos
 
         for i, sample_id in enumerate(sample["id"].tolist()):
             has_target = sample["target"] is not None

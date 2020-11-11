@@ -341,6 +341,7 @@ class TransformerDecoderLayer(nn.Module):
         else:
             y = x
 
+        torch.cuda.nvtx.range_push("self_attn")
         x, attn = self.self_attn(
             query=x,
             key=y,
@@ -350,6 +351,7 @@ class TransformerDecoderLayer(nn.Module):
             need_weights=False,
             attn_mask=self_attn_mask,
         )
+        torch.cuda.nvtx.range_pop()
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
         if not self.normalize_before:
@@ -370,6 +372,7 @@ class TransformerDecoderLayer(nn.Module):
                 assert incremental_state is not None
                 self.encoder_attn._set_input_buffer(incremental_state, saved_state)
 
+            torch.cuda.nvtx.range_push("encoder_attn")
             x, attn = self.encoder_attn(
                 query=x,
                 key=encoder_out,
@@ -380,6 +383,7 @@ class TransformerDecoderLayer(nn.Module):
                 need_weights=need_attn or (not self.training and self.need_attn),
                 need_head_weights=need_head_weights,
             )
+            torch.cuda.nvtx.range_pop()
             x = self.dropout_module(x)
             x = self.residual_connection(x, residual)
             if not self.normalize_before:
@@ -389,11 +393,13 @@ class TransformerDecoderLayer(nn.Module):
         if self.normalize_before:
             x = self.final_layer_norm(x)
 
+        torch.cuda.nvtx.range_push("ffn")
         x = self.activation_fn(self.fc1(x))
         x = self.activation_dropout_module(x)
         x = self.fc2(x)
         x = self.dropout_module(x)
         x = self.residual_connection(x, residual)
+        torch.cuda.nvtx.range_pop()
         if not self.normalize_before:
             x = self.final_layer_norm(x)
         if self.onnx_trace and incremental_state is not None:

@@ -234,7 +234,9 @@ class SequenceGenerator(nn.Module):
             self.min_len <= max_len
         ), "min_len cannot be larger than max_len, please adjust these!"
         # compute the encoder output for each beam
+        torch.cuda.nvtx.range_push("encoder")
         encoder_outs = self.model.forward_encoder(net_input)
+        torch.cuda.nvtx.range_pop()
 
         # placeholder of indices for bsz * beam_size to hold tokens and accumulative scores
         new_order = torch.arange(bsz).view(-1, 1).repeat(1, beam_size).view(-1)
@@ -308,12 +310,14 @@ class SequenceGenerator(nn.Module):
                     encoder_outs, reorder_state
                 )
 
+            torch.cuda.nvtx.range_push("1_step")
             lprobs, avg_attn_scores = self.model.forward_decoder(
                 tokens[:, : step + 1],
                 encoder_outs,
                 incremental_states,
                 self.temperature,
             )
+            torch.cuda.nvtx.range_pop()
 
             if self.lm_model is not None:
                 lm_out = self.lm_model(tokens[:, : step + 1])
@@ -323,7 +327,8 @@ class SequenceGenerator(nn.Module):
                 probs = probs[:, -1, :] * self.lm_weight
                 lprobs += probs
 
-            lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
+            if (lprobs != lprobs).any():
+                lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
 
             lprobs[:, self.pad] = -math.inf  # never select pad
             lprobs[:, self.unk] -= self.unk_penalty  # apply unk penalty
@@ -366,7 +371,8 @@ class SequenceGenerator(nn.Module):
                 self.search.set_src_lengths(src_lengths)
 
             if self.no_repeat_ngram_size > 0:
-                lprobs = self._no_repeat_ngram(tokens, lprobs, bsz, beam_size, step)
+                # lprobs = self._no_repeat_ngram(tokens, lprobs, bsz, beam_size, step)
+                lprobs = self._no_repeat_ngram_fast(tokens, lprobs, bsz, beam_size, step)
 
             # Shape: (batch, cand_size)
             cand_scores, cand_indices, cand_beams = self.search.step(
@@ -528,6 +534,7 @@ class SequenceGenerator(nn.Module):
             # reorder incremental state in decoder
             reorder_state = active_bbsz_idx
 
+        torch.cuda.nvtx.range_push("sort_score")
         # sort by score descending
         for sent in range(len(finalized)):
             scores = torch.tensor(
@@ -538,6 +545,7 @@ class SequenceGenerator(nn.Module):
             finalized[sent] = torch.jit.annotate(
                 List[Dict[str, Tensor]], finalized[sent]
             )
+        torch.cuda.nvtx.range_pop()
         return finalized
 
     def _prefix_tokens(
@@ -730,6 +738,42 @@ class SequenceGenerator(nn.Module):
         min_len = min([len(x) for x in l])  # noqa
         l2 = [[row[i] for row in l] for i in range(min_len)]
         return l2
+
+    def _no_repeat_ngram_fast(self, tokens, lprobs, bsz: int, beam_size: int, step: int):
+        banned_list = [[] for bbsz_idx in range(bsz * beam_size)]
+        cpu_tokens = tokens.cpu()[:, :step + 1].numpy()
+        check_start_pos = step + 2 - self.no_repeat_ngram_size
+        for bbsz_idx in range(bsz * beam_size):
+            for i in range(check_start_pos):
+                is_banned = True
+                for k in range(self.no_repeat_ngram_size - 1):
+                    if cpu_tokens[bbsz_idx, i + k] != cpu_tokens[
+                        bbsz_idx, check_start_pos + k]:
+                        is_banned = False
+                        break
+                if is_banned:
+                    banned_list[bbsz_idx].append(
+                        cpu_tokens[bbsz_idx,
+                        i + self.no_repeat_ngram_size - 1])
+        
+        def calculate_banned_tokens(bbsz_idx):
+            # before decoding the next token, prevent decoding of ngrams that have already appeared
+            banned_tokens_per_sample = [
+                (bbsz_idx, t) for t in banned_list[bbsz_idx]
+            ]
+            return banned_tokens_per_sample
+
+        banned_tokens = []
+        if step + 2 - self.no_repeat_ngram_size >= 0:
+            for bbsz_idx in range(bsz * beam_size):
+                banned_tokens.extend(calculate_banned_tokens(bbsz_idx))
+
+        if banned_tokens:
+            lprobs.index_put_(
+                tuple(torch.LongTensor(banned_tokens).t()),
+                lprobs.new_tensor([-math.inf] * len(banned_tokens)))
+
+        return lprobs
 
     def _no_repeat_ngram(self, tokens, lprobs, bsz: int, beam_size: int, step: int):
         # for each beam and batch sentence, generate a list of previous ngrams

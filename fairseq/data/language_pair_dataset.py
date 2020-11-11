@@ -426,8 +426,8 @@ class LanguagePairDataset(FairseqDataset):
         if self.buckets is None:
             # sort by target length, then source length
             if self.tgt_sizes is not None:
-                indices = indices[np.argsort(self.tgt_sizes[indices], kind="mergesort")]
-            return indices[np.argsort(self.src_sizes[indices], kind="mergesort")]
+                indices = indices[np.argsort(self.tgt_sizes[indices], kind="mergesort")[::-1]]
+            return indices[np.argsort(self.src_sizes[indices], kind="mergesort")[::-1]]
         else:
             # sort by bucketed_num_tokens, which is:
             #   max(padded_src_len, padded_tgt_len)
