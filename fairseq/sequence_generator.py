@@ -67,6 +67,7 @@ class SequenceGenerator(nn.Module):
         self.pad = tgt_dict.pad()
         self.unk = tgt_dict.unk()
         self.eos = tgt_dict.eos() if eos is None else eos
+        self.bos = tgt_dict.bos()
         self.symbols_to_strip_from_output = (
             symbols_to_strip_from_output.union({self.eos})
             if symbols_to_strip_from_output is not None
@@ -330,6 +331,7 @@ class SequenceGenerator(nn.Module):
             if (lprobs != lprobs).any():
                 lprobs[lprobs != lprobs] = torch.tensor(-math.inf).to(lprobs)
 
+            lprobs[:, self.bos] = -math.inf  # never select bos
             lprobs[:, self.pad] = -math.inf  # never select pad
             lprobs[:, self.unk] -= self.unk_penalty  # apply unk penalty
 

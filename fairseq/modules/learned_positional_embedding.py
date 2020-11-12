@@ -35,9 +35,9 @@ class LearnedPositionalEmbedding(nn.Embedding):
         positions: Optional[Tensor] = None,
     ):
         """Input is expected to be of size [bsz x seqlen]."""
-        assert (positions is None) or (
-            self.padding_idx is None
-        ), "If positions is pre-computed then padding_idx should not be set."
+        # assert (positions is None) or (
+        #     self.padding_idx is None
+        # ), "If positions is pre-computed then padding_idx should not be set."
 
         if positions is None:
             if incremental_state is not None:

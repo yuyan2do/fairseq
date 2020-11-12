@@ -125,6 +125,12 @@ def collate(
             0, sort_order
         )
 
+    if samples[0].get("target_positions", None) is not None:
+        target_positions = merge("target_positions", left_pad=left_pad_target)
+        batch["net_input"]["target_positions"] = target_positions.index_select(
+            0, sort_order
+        )
+
     if samples[0].get("alignment", None) is not None:
         bsz, tgt_sz = batch["target"].shape
         src_sz = batch["net_input"]["src_tokens"].shape[1]

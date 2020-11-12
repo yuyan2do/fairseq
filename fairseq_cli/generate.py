@@ -183,6 +183,7 @@ def _main(cfg: DictConfig, output_file):
     has_target = True
     wps_meter = TimeMeter()
     for sample in progress:
+        cpu_sample = sample
         sample = utils.move_to_cuda(sample) if use_cuda else sample
         if "net_input" not in sample:
             continue
@@ -210,6 +211,7 @@ def _main(cfg: DictConfig, output_file):
 
         hypos = [h[:cfg.generation.nbest] for h in hypos]
         hypos = utils.move_to_cpu(hypos) if use_cuda else hypos
+        sample = cpu_sample
 
         for i, sample_id in enumerate(sample["id"].tolist()):
             has_target = sample["target"] is not None
