@@ -5,14 +5,15 @@
 
 import ast
 import os
+import re
 from argparse import ArgumentError, ArgumentParser, Namespace
 from dataclasses import _MISSING_TYPE, MISSING
 from enum import Enum
+import inspect
 from typing import Any, Dict, List, Tuple, Type
 
 from fairseq.dataclass import FairseqDataclass
 from fairseq.dataclass.configs import FairseqConfig
-from hydra.core.global_hydra import GlobalHydra
 from hydra.experimental import compose, initialize
 from omegaconf import DictConfig, OmegaConf, open_dict
 
@@ -30,13 +31,25 @@ def eval_str_list(x, x_type=float):
         return [x_type(x)]
 
 
+def interpret_dc_type(field_type):
+    if isinstance(field_type, str):
+        raise RuntimeError("field should be a type")
+
+    if field_type == Any:
+        return str
+
+    typestring = str(field_type)
+    if re.match(r"(typing.|^)Union\[(.*), NoneType\]$", typestring):
+        return field_type.__args__[0]
+    return field_type
+
+
 def gen_parser_from_dataclass(
     parser: ArgumentParser,
     dataclass_instance: FairseqDataclass,
     delete_default: bool = False,
 ) -> None:
     """convert a dataclass instance to tailing parser arguments"""
-    import re
 
     def argparse_name(name: str):
         if name == "data":
@@ -46,14 +59,6 @@ def gen_parser_from_dataclass(
             # private member, skip
             return None
         return "--" + name.replace("_", "-")
-
-    def interpret_dc_type(field_type):
-        if isinstance(field_type, str):
-            raise RuntimeError("field should be a type")
-        typestring = str(field_type)
-        if re.match(r"(typing.|^)Union\[(.*), NoneType\]$", typestring):
-            return field_type.__args__[0]
-        return field_type
 
     def get_kwargs_from_dc(
         dataclass_instance: FairseqDataclass, k: str
@@ -82,9 +87,10 @@ def gen_parser_from_dataclass(
                 kwargs["required"] = True
             if field_choices is not None:
                 kwargs["choices"] = field_choices
-            if (isinstance(inter_type, type) and issubclass(inter_type, List)) or (
-                "List" in str(inter_type)
-            ):
+            if (
+                isinstance(inter_type, type)
+                and (issubclass(inter_type, List) or issubclass(inter_type, Tuple))
+            ) or ("List" in str(inter_type) or "Tuple" in str(inter_type)):
                 if "int" in str(inter_type):
                     kwargs["type"] = lambda x: eval_str_list(x, int)
                 elif "float" in str(inter_type):
@@ -92,7 +98,9 @@ def gen_parser_from_dataclass(
                 elif "str" in str(inter_type):
                     kwargs["type"] = lambda x: eval_str_list(x, str)
                 else:
-                    raise NotImplementedError()
+                    raise NotImplementedError(
+                        "parsing of type " + str(inter_type) + " is not implemented"
+                    )
                 if field_default is not MISSING:
                     kwargs["default"] = (
                         ",".join(map(str, field_default))
@@ -127,8 +135,13 @@ def gen_parser_from_dataclass(
 
     for k in dataclass_instance._get_all_attributes():
         field_name = argparse_name(dataclass_instance._get_name(k))
+        field_type = dataclass_instance._get_type(k)
         if field_name is None:
             continue
+        elif inspect.isclass(field_type) and issubclass(field_type, FairseqDataclass):
+            gen_parser_from_dataclass(parser, field_type(), delete_default)
+            continue
+
         kwargs = get_kwargs_from_dc(dataclass_instance, k)
 
         field_args = [field_name]
@@ -177,6 +190,9 @@ def _override_attr(
 ) -> List[str]:
     overrides = []
 
+    if not inspect.isclass(data_class) or not issubclass(data_class, FairseqDataclass):
+        return overrides
+
     def get_default(f):
         if not isinstance(f.default_factory, _MISSING_TYPE):
             return f.default_factory()
@@ -189,14 +205,37 @@ def _override_attr(
 
         val = get_default(v) if not hasattr(args, k) else getattr(args, k)
 
+        field_type = interpret_dc_type(v.type)
+        if (
+            isinstance(val, str)
+            and not val.startswith("${")  # not interpolation
+            and field_type != str
+            and inspect.isclass(field_type) and not issubclass(field_type, Enum)  # not choices enum
+        ):
+            # upgrade old models that stored complex parameters as string
+            val = ast.literal_eval(val)
+
+        if isinstance(val, tuple):
+            val = list(val)
+
+        if getattr(v.type, "__origin__", None) is List:
+            # if type is int but val is float, then we will crash later - try to convert here
+            t_args = v.type.__args__
+            if len(t_args) == 1:
+                val = list(map(t_args[0], val))
+
         if val is None:
             overrides.append("{}.{}=null".format(sub_node, k))
         elif val == "":
             overrides.append("{}.{}=''".format(sub_node, k))
         elif isinstance(val, str):
+            val = val.replace("'", r"\'")
             overrides.append("{}.{}='{}'".format(sub_node, k, val))
+        elif isinstance(val, FairseqDataclass):
+            overrides += _override_attr(f"{sub_node}.{k}", type(val), args)
         else:
             overrides.append("{}.{}={}".format(sub_node, k, val))
+
     return overrides
 
 
@@ -255,13 +294,14 @@ def override_module_args(args: Namespace) -> Tuple[List[str], List[str]]:
 
         no_dc = True
         if hasattr(args, "arch"):
-            from fairseq.models import ARCH_MODEL_REGISTRY
+            from fairseq.models import ARCH_MODEL_REGISTRY, ARCH_MODEL_NAME_REGISTRY
 
             if args.arch in ARCH_MODEL_REGISTRY:
                 m_cls = ARCH_MODEL_REGISTRY[args.arch]
                 dc = getattr(m_cls, "__dataclass", None)
                 if dc is not None:
-                    overrides.append("model={}".format(args.arch))
+                    m_name = ARCH_MODEL_NAME_REGISTRY[args.arch]
+                    overrides.append("model={}".format(m_name))
                     overrides.append("model._name={}".format(args.arch))
                     # override model params with those exist in args
                     overrides.extend(_override_attr("model", dc, args))
@@ -280,11 +320,8 @@ def convert_namespace_to_omegaconf(args: Namespace) -> DictConfig:
 
     # configs will be in fairseq/config after installation
     config_path = os.path.join("..", "config")
-    if not os.path.exists(config_path):
-        # in case of "--editable" installs we need to go one dir up
-        config_path = os.path.join("..", "..", "config")
 
-    with initialize(config_path=config_path, strict=True):
+    with initialize(config_path=config_path):
         composed_cfg = compose("config", overrides=overrides, strict=False)
         for k in deletes:
             composed_cfg[k] = None
@@ -337,7 +374,7 @@ def convert_namespace_to_omegaconf(args: Namespace) -> DictConfig:
 
 
 def populate_dataclass(
-    args: Namespace, dataclass: FairseqDataclass
+    dataclass: FairseqDataclass, args: Namespace,
 ) -> FairseqDataclass:
     for k in dataclass.__dataclass_fields__.keys():
         if k.startswith("_"):
@@ -346,15 +383,39 @@ def populate_dataclass(
         if hasattr(args, k):
             setattr(dataclass, k, getattr(args, k))
 
-        return dataclass
+    return dataclass
 
 
 def overwrite_args_by_name(cfg: DictConfig, overrides: Dict[str, any]):
     # this will be deprecated when we get rid of argparse and model_overrides logic
 
+    from fairseq.registry import REGISTRIES
+
     with open_dict(cfg):
         for k in cfg.keys():
-            if isinstance(cfg[k], DictConfig):
+            # "k in cfg" will return false if its a "mandatory value (e.g. ???)"
+            if k in cfg and isinstance(cfg[k], DictConfig):
                 overwrite_args_by_name(cfg[k], overrides)
+            elif k in cfg and isinstance(cfg[k], Namespace):
+                for override_key, val in overrides.items():
+                    setattr(cfg[k], override_key, val)
             elif k in overrides:
-                cfg[k] = overrides[k]
+                if (
+                    k in REGISTRIES
+                    and overrides[k] in REGISTRIES[k]["dataclass_registry"]
+                ):
+                    cfg[k] = DictConfig(
+                        REGISTRIES[k]["dataclass_registry"][overrides[k]]
+                    )
+                    overwrite_args_by_name(cfg[k], overrides)
+                    cfg[k]._name = overrides[k]
+                else:
+                    cfg[k] = overrides[k]
+
+
+def merge_with_parent(dc: FairseqDataclass, cfg: FairseqDataclass):
+    dc_instance = DictConfig(dc)
+    dc_instance.__dict__["_parent"] = cfg.__dict__["_parent"]
+    cfg = OmegaConf.merge(dc_instance, cfg)
+    OmegaConf.set_struct(cfg, True)
+    return cfg

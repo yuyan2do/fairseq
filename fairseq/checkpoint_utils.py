@@ -21,7 +21,6 @@ from fairseq.dataclass.utils import (
 from fairseq.file_io import PathManager
 from fairseq.models import FairseqDecoder, FairseqEncoder
 from omegaconf import DictConfig, open_dict
-from torch.serialization import default_restore_location
 
 
 logger = logging.getLogger(__name__)
@@ -225,9 +224,7 @@ def load_checkpoint(cfg: CheckpointConfig, trainer, **passthrough_args):
 def load_checkpoint_to_cpu(path, arg_overrides=None):
     """Loads a checkpoint to CPU (with upgrading for backward compatibility)."""
     with open(PathManager.get_local_path(path), "rb") as f:
-        state = torch.load(
-            f, map_location=lambda s, l: default_restore_location(s, "cpu")
-        )
+        state = torch.load(f, map_location=torch.device("cpu"))
 
     if "args" in state and state["args"] is not None and arg_overrides is not None:
         args = state["args"]
@@ -242,7 +239,7 @@ def load_checkpoint_to_cpu(path, arg_overrides=None):
 
 
 def load_model_ensemble(
-    filenames, arg_overrides=None, task=None, strict=True, suffix="", num_shards=1
+    filenames, arg_overrides=None, task=None, strict=True, suffix="", num_shards=1, state=None
 ):
     """Loads an ensemble of models.
 
@@ -262,12 +259,13 @@ def load_model_ensemble(
         strict,
         suffix,
         num_shards,
+        state,
     )
     return ensemble, args
 
 
 def load_model_ensemble_and_task(
-    filenames, arg_overrides=None, task=None, strict=True, suffix="", num_shards=1
+    filenames, arg_overrides=None, task=None, strict=True, suffix="", num_shards=1, state=None
 ):
     from fairseq import tasks
 
@@ -275,8 +273,10 @@ def load_model_ensemble_and_task(
         strict and num_shards > 1
     ), "Cannot load state dict with strict=True and checkpoint shards > 1"
     ensemble = []
+    cfg = None
     for filename in filenames:
         orig_filename = filename
+        assert num_shards > 0
         for shard_idx in range(num_shards):
             if num_shards == 1:
                 filename = filename.replace(".pt", suffix + ".pt")
@@ -285,7 +285,8 @@ def load_model_ensemble_and_task(
 
             if not PathManager.exists(filename):
                 raise IOError("Model file not found: {}".format(filename))
-            state = load_checkpoint_to_cpu(filename, arg_overrides)
+            if state is None:
+                state = load_checkpoint_to_cpu(filename, arg_overrides)
             if "args" in state and state["args"] is not None:
                 cfg = convert_namespace_to_omegaconf(state["args"])
             elif "cfg" in state and state["cfg"] is not None:
@@ -384,6 +385,9 @@ def save_state(
         no_save_optimizer_state = cfg.no_save_optimizer_state
     if not no_save_optimizer_state:
         state_dict["last_optimizer_state"] = optimizer.state_dict()
+
+    # keep everything on CPU
+    state_dict = utils.move_to_cpu(state_dict)
 
     with PathManager.open(filename, "wb") as f:
         torch_persistent_save(state_dict, f)
