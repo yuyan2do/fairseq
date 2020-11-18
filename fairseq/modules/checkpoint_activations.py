@@ -6,6 +6,7 @@
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from torch.utils.checkpoint import checkpoint
 
 from fairseq import utils
 
