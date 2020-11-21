@@ -89,6 +89,12 @@ def collate(
     if prev_output_tokens is not None:
         batch["net_input"]["prev_output_tokens"] = prev_output_tokens
 
+    if samples[0].get("target_positions", None) is not None:
+        target_positions = merge("target_positions", left_pad=left_pad_target)
+        batch["net_input"]["target_positions"] = target_positions.index_select(
+            0, sort_order
+        )
+
     return batch
 
 
